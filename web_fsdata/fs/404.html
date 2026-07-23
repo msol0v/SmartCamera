@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 — Космическая заминка</title>
+    <style>
+        /* CSS СТИЛИ */
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            background: #020408;
+            color: #fff;
+            font-family: 'system-ui', -apple-system, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+
+        /* Анимированный фон со звездами */
+        .space {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #1b2735 0%, #090a0f 100%);
+            z-index: -1;
+        }
+
+        .container {
+            text-align: center;
+            z-index: 10;
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: clamp(8rem, 20vw, 12rem);
+            margin: 0;
+            line-height: 1;
+            background: linear-gradient(to bottom, #fff, #444);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 20px rgba(255,255,255,0.3));
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 300;
+            color: #aaa;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 15px 40px;
+            border: 1px solid rgba(255,255,255,0.4);
+            color: #fff;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: 0.3s;
+            backdrop-filter: blur(5px);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .btn:hover {
+            background: #fff;
+            color: #000;
+            box-shadow: 0 0 30px rgba(255,255,255,0.5);
+        }
+
+        /* Стили персонажа */
+        .astronaut {
+            position: absolute;
+            font-size: 5rem;
+            pointer-events: none;
+            user-select: none;
+            z-index: 5;
+            transition: transform 0.15s ease-out;
+            will-change: transform;
+        }
+
+        /* Декоративные мелкие звезды */
+        .star {
+            position: absolute;
+            background: #fff;
+            border-radius: 50%;
+            opacity: 0.5;
+            animation: twinkle var(--duration) infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="space" id="space"></div>
+
+<div class="astronaut" id="astronaut">👨‍🚀</div>
+
+<main class="container">
+    <h1>404</h1>
+    <h2>Связь с базой потеряна. Вы в глубоком космосе.</h2>
+    <a href="/" class="btn">Вернуться на Землю</a>
+</main>
+
+<script>
+    // JS ЛОГИКА
+    const astronaut = document.getElementById('astronaut');
+    const space = document.getElementById('space');
+
+    // Создаем случайные звезды
+    function createStars() {
+        for (let i = 0; i < 150; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            const size = Math.random() * 3 + 'px';
+            star.style.width = size;
+            star.style.height = size;
+            star.style.top = Math.random() * 100 + '%';
+            star.style.left = Math.random() * 100 + '%';
+            star.style.setProperty('--duration', (Math.random() * 3 + 2) + 's');
+            space.appendChild(star);
+        }
+    }
+
+    // Слежение за мышью
+    let mouseX = window.innerWidth / 2;
+    let mouseY = window.innerHeight / 2;
+    let currentX = mouseX;
+    let currentY = mouseY;
+
+    document.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    function animate() {
+        // Плавная интерполяция (easing)
+        currentX += (mouseX - currentX) * 0.05;
+        currentY += (mouseY - currentY) * 0.05;
+
+        const rotate = (mouseX - window.innerWidth / 2) * 0.05;
+
+        astronaut.style.left = `${currentX}px`;
+        astronaut.style.top = `${currentY}px`;
+        astronaut.style.transform = `translate(-50%, -50%) rotate(${rotate}deg)`;
+
+        requestAnimationFrame(animate);
+    }
+
+    createStars();
+    animate();
+</script>
+</body>
+</html>

@@ -32,7 +32,14 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
 enable_language(C ASM)
 
 # Create an executable object type
-add_executable(${CMAKE_PROJECT_NAME})
+add_executable(${CMAKE_PROJECT_NAME}
+        Core/Src/FreeRTOS_CLI.c
+        Core/Src/cli.c
+        Core/Src/cmd_ip.c
+        Core/Inc/motor_task.h
+        Core/Src/motor_task.c
+        Core/Src/pwm_task.c
+        Core/Inc/pwm_task.h)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)

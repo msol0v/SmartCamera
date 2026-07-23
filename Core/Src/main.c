@@ -23,7 +23,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "cli.h"
+#include "httpd.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,6 +46,9 @@
 
 QSPI_HandleTypeDef hqspi;
 
+TIM_HandleTypeDef htim8;
+TIM_HandleTypeDef htim9;
+
 UART_HandleTypeDef huart7;
 
 /* Definitions for defaultTask */
@@ -55,7 +59,8 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
-
+osMessageQueueId_t pwmQueueHandle;
+osMessageQueueId_t motorQueueHandle;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -63,6 +68,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_QUADSPI_Init(void);
 static void MX_UART7_Init(void);
+static void MX_TIM8_Init(void);
+static void MX_TIM9_Init(void);
 void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -78,22 +85,20 @@ int __io_putchar(int ch) {
   return ch;
 }
 
-// Поток вывода dhcp дреса
-osThreadId_t dhcpCheckTaskHandle;
+osThreadId_t dhcpCheckTaskHandle = NULL;
 const osThreadAttr_t dhcpCheck_attributes = {
   .name = "dhcpCheckTask",
-  .stack_size = 256 * 2, // Задача маленькая, большой стек не нужен
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 
 void StartDhcpTask(void *argument) {
-
   struct netif *nif = netif_default;
 
   for(;;)
   {
-    // Проверяем, поднят ли сетевой интерфейс и получен ли валидный IP
-    if (netif_is_up(nif) && nif->ip_addr.addr != 0)
+    // Ждём, пока netif поднимется и получит любой адрес, отличный от 0.0.0.0
+    if (nif != NULL && netif_is_up(nif) && nif->ip_addr.addr != 0)
     {
       uint8_t ip[4];
       ip[0] = ip4_addr1(&nif->ip_addr);
@@ -101,23 +106,22 @@ void StartDhcpTask(void *argument) {
       ip[2] = ip4_addr3(&nif->ip_addr);
       ip[3] = ip4_addr4(&nif->ip_addr);
 
-      printf("DHCP IP: %d.%d.%d.%d\n", ip[0], ip[1], ip[2], ip[3]);
+      printf("\r\n[DHCP] Assigned IP: %d.%d.%d.%d\r\n>", ip[0], ip[1], ip[2], ip[3]);
 
-      osStatus_t status;
-      status = osThreadTerminate(dhcpCheckTaskHandle);
-      if (status == osOK) {
-        dhcpCheckTaskHandle = NULL;
-      }
+      // Самоликвидация задачи
+      dhcpCheckTaskHandle = NULL;
+      osThreadExit(); // Более безопасный способ завершить ТЕКУЩИЙ поток в CMSIS-RTOS v2
     }
-    else
-    {
-      osDelay(500); // Ждем получения IP
-    }
+
+    osDelay(500); // Проверяем каждые 500 мс
   }
 }
 
 void startDhcpCheckTask(void) {
-  dhcpCheckTaskHandle = osThreadNew(StartDhcpTask, NULL, &dhcpCheck_attributes);
+  // Запускаем поток только если он ещё не работает
+  if (dhcpCheckTaskHandle == NULL) {
+    dhcpCheckTaskHandle = osThreadNew(StartDhcpTask, NULL, &dhcpCheck_attributes);
+  }
 }
 /* USER CODE END 0 */
 
@@ -152,6 +156,8 @@ int main(void)
   MX_GPIO_Init();
   MX_QUADSPI_Init();
   MX_UART7_Init();
+  MX_TIM8_Init();
+  MX_TIM9_Init();
   /* USER CODE BEGIN 2 */
 
   // Конфигурируем QSPI для работы в MemoryMapped режиме
@@ -190,6 +196,11 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
+
+  // Очередь команд управления моторами
+  motorQueueHandle = osMessageQueueNew(4,sizeof(MotorCommand_t), NULL);
+  // Очередь сообщений шим
+  pwmQueueHandle = osMessageQueueNew(8, sizeof(PWM_Message_t), NULL);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -198,7 +209,9 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-  dhcpCheckTaskHandle = osThreadNew(StartDhcpTask, NULL, &dhcpCheck_attributes);
+  cliTaskHandle = osThreadNew(vCommandConsoleTask, &huart7, &cliTask_attributes);
+  //motorTaskHandle = osThreadNew(MotorTask, NULL, &motorTask_attributes);
+  //pwmTaskHandle = osThreadNew( PWM_Task, NULL, &pwmTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -309,6 +322,135 @@ static void MX_QUADSPI_Init(void)
 }
 
 /**
+  * @brief TIM8 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM8_Init(void)
+{
+
+  /* USER CODE BEGIN TIM8_Init 0 */
+
+  /* USER CODE END TIM8_Init 0 */
+
+  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
+
+  /* USER CODE BEGIN TIM8_Init 1 */
+
+  /* USER CODE END TIM8_Init 1 */
+  htim8.Instance = TIM8;
+  htim8.Init.Prescaler = 216;
+  htim8.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim8.Init.Period = 65535;
+  htim8.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim8.Init.RepetitionCounter = 0;
+  htim8.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_Init(&htim8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_RESET;
+  sSlaveConfig.InputTrigger = TIM_TS_TI1FP1;
+  sSlaveConfig.TriggerPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sSlaveConfig.TriggerFilter = 0;
+  if (HAL_TIM_SlaveConfigSynchro(&htim8, &sSlaveConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim8, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim8, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_FALLING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_INDIRECTTI;
+  if (HAL_TIM_IC_ConfigChannel(&htim8, &sConfigIC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM8_Init 2 */
+
+  /* USER CODE END TIM8_Init 2 */
+
+}
+
+/**
+  * @brief TIM9 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM9_Init(void)
+{
+
+  /* USER CODE BEGIN TIM9_Init 0 */
+
+  /* USER CODE END TIM9_Init 0 */
+
+  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
+
+  /* USER CODE BEGIN TIM9_Init 1 */
+
+  /* USER CODE END TIM9_Init 1 */
+  htim9.Instance = TIM9;
+  htim9.Init.Prescaler = 215;
+  htim9.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim9.Init.Period = 65535;
+  htim9.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim9.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim9) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_Init(&htim9) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_RESET;
+  sSlaveConfig.InputTrigger = TIM_TS_TI1FP1;
+  sSlaveConfig.TriggerPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sSlaveConfig.TriggerFilter = 0;
+  if (HAL_TIM_SlaveConfigSynchro(&htim9, &sSlaveConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim9, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_FALLING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_INDIRECTTI;
+  if (HAL_TIM_IC_ConfigChannel(&htim9, &sConfigIC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM9_Init 2 */
+
+  /* USER CODE END TIM9_Init 2 */
+
+}
+
+/**
   * @brief UART7 Initialization Function
   * @param None
   * @retval None
@@ -350,6 +492,7 @@ static void MX_UART7_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
   /* USER CODE BEGIN MX_GPIO_Init_1 */
 
   /* USER CODE END MX_GPIO_Init_1 */
@@ -361,6 +504,55 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(RESET_PHY_GPIO_Port, RESET_PHY_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, LED_CNTRL_Pin|EN_DRIV2_Pin|EN_DRIV3_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, IN3_DRIV_Pin|IN2_DRIV_Pin|IN4_DRIV_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOD, IN1_DRIV_Pin|EN_DRIV1_Pin|REED_SW1_Pin|REED_SW2_Pin
+                          |REED_SW3_Pin|REED_SW4_Pin|REED_SW5_Pin|REED_SW6_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : RESET_PHY_Pin */
+  GPIO_InitStruct.Pin = RESET_PHY_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(RESET_PHY_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PE10 */
+  GPIO_InitStruct.Pin = GPIO_PIN_10;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : LED_CNTRL_Pin EN_DRIV2_Pin EN_DRIV3_Pin */
+  GPIO_InitStruct.Pin = LED_CNTRL_Pin|EN_DRIV2_Pin|EN_DRIV3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : IN3_DRIV_Pin IN2_DRIV_Pin IN4_DRIV_Pin */
+  GPIO_InitStruct.Pin = IN3_DRIV_Pin|IN2_DRIV_Pin|IN4_DRIV_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : IN1_DRIV_Pin EN_DRIV1_Pin REED_SW1_Pin REED_SW2_Pin
+                           REED_SW3_Pin REED_SW4_Pin REED_SW5_Pin REED_SW6_Pin */
+  GPIO_InitStruct.Pin = IN1_DRIV_Pin|EN_DRIV1_Pin|REED_SW1_Pin|REED_SW2_Pin
+                          |REED_SW3_Pin|REED_SW4_Pin|REED_SW5_Pin|REED_SW6_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -383,7 +575,12 @@ void StartDefaultTask(void *argument)
   /* init code for LWIP */
   MX_LWIP_Init();
   /* USER CODE BEGIN 5 */
-  printf("Start main thread\r\n");
+
+  //Стартуем веб
+  httpd_init();
+
+  startDhcpCheckTask();
+
   /* Infinite loop */
   for(;;)
   {

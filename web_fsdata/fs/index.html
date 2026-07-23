@@ -1,0 +1,500 @@
+<!DOCTYPE HTML><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxMDAgMTAwJz48cmVjdCB3aWR0aD0nMTAwJyBoZWlnaHQ9JzEwMCcgcng9JzIwJyBmaWxsPScjMDAyYjY2Jy8+PHRleHQgeD0nNTAnIHk9JzczJyBmb250LXNpemU9JzcwJyBmb250LWZhbWlseT0nQXJpYWwsIHNhbnMtc2VyaWYnIGZpbGw9J3doaXRlJyB0ZXh0LWFuY2hvcj0nbWlkZGxlJyBmb250LXdlaWdodD0nYm9sZCc+SDwvdGV4dD48L3N2Zz4=" type="image/svg+xml">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1a1b1e; font-family: sans-serif; color: #e0e0e0; display: flex; justify-content: center; padding: 25px; min-height: 100vh; }
+        .preset-card { background: #2a2b2e; border-radius: 8px; padding: 5px; margin-bottom: 12px; border: 1px solid #3d3e42; transition: all 0.3s ease; display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+        .preset-card:hover { border-color: #00ff88; box-shadow: 0 4px 15px rgba(0,255,136,0.1); }
+        .preset-info { display: flex; flex-direction: column; gap: 8px; }
+        .preset-empty { color: #666 !important; font-style: italic; }
+        .preset-name-input { background: transparent; border: none; border-bottom: 1px solid #444; color: #00ff88; font-size: 16px; padding: 4px 0; outline: none; transition: 0.3s; }
+        .preset-name-input:focus { border-bottom-color: #00ff88; }
+        .btn-save-custom { color: #00ff88 !important; border-color: rgba(0, 255, 136, 0.3) !important; background: rgba(0, 255, 136, 0.05) !important; }
+        .btn-delete-custom { color: #ff4444 !important; border-color: rgba(255, 68, 68, 0.3) !important; background: rgba(255, 68, 68, 0.05) !important; }
+        .preset-actions { display: flex; gap: 8px; align-items: center; }
+        .btn-icon { background: #333; border: 1px solid #444; padding: 10px; width: 40px; height: 40px; justify-content: center; }
+        .btn-save-icon:hover { border-color: #00ff88; color: #00ff88; }
+        .btn-delete-icon:hover { border-color: #ff4444; color: #ff4444; }
+        .main-panel { display: flex; flex-direction: column; background: #252629; border: 1px solid #404040; width: 100%; max-width: 1200px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); }
+        .header-area { padding: 30px 0 15px 0; border-bottom: 1px solid #333; }
+        .content-area { display: flex; flex-wrap: wrap; flex: 1; }
+        .column { padding: 35px; flex: 1; min-width: 450px; display: flex; flex-direction: column; }
+        .right-column { border-left: 1px solid #404040; background: #202124; }
+        .column:first-child .action-area { margin-top: 20px; }
+        .right-column .action-area { margin-top: 20px; }
+        h3 { text-align: center; letter-spacing: 4px; font-size: 24px; text-transform: uppercase; }
+        h3 span { color: #00ff88; }
+        .section-title { color: #00ff88; font-size: 11px; text-align: center; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 1.5px; }
+        .section { margin-bottom: 30px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; justify-items: center; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        button { width: 100%; padding: 18px 5px; background: #2c2d30; color: #e0e0e0; border: 1px solid #45464a; cursor: pointer; border-radius: 4px; font-size: 16px; display: flex; align-items: center; transition: 0.1s; }
+        button:hover { background: #36373a; border-color: #00ff88; }
+        .btn-motor { justify-content: space-between; padding: 18px 15px !important; }
+        .active-mode, .active-motor { background: #00ff88 !important; color: #1a1b1e !important; font-weight: bold; border-color: #00ff88; }
+        /* 1. БАЗОВОЕ СОСТОЯНИЕ: цветной текст, рамка, центрирование и размер шрифта */
+        .cmd-neg { color: #4dabf7 !important; border-color: #4dabf7 !important; justify-content: center; font-size: 26px; }
+        .cmd-pos { color: #f5b041 !important; border-color: #f5b041 !important; justify-content: center; font-size: 26px; }
+
+        /* 2. ПРИ НАВЕДЕНИИ МЫШИ (HOVER): легкий полупрозрачный фон */
+        .cmd-neg:hover { background: rgba(77, 171, 247, 0.1) !important; }
+        .cmd-pos:hover { background: rgba(245, 176, 65, 0.1) !important; }
+
+        /* 3. ПРИ КЛИКЕ (ACTIVE): полная яркая заливка, темный текст и неоновое свечение */
+        .cmd-neg:active { background: #4dabf7 !important; color: #1a1b1e !important; box-shadow: 0 0 15px #4dabf7 !important; }
+        .cmd-pos:active { background: #f5b041 !important; color: #1a1b1e !important; box-shadow: 0 0 15px #f5b041 !important; }
+        .action-area { margin-top: 20px; }
+        .btn-final { width: 100%; height: 65px; font-weight: bold; text-transform: uppercase; justify-content: center; border-width: 2px; }
+        .cmd-stop { color: #ff4444; border-color: #ff4444; background: rgba(255, 68, 68, 0.05); font-size: 22px; letter-spacing: 2px; }
+        /* Отключаем зеленую рамку при наведении (перебиваем стандартный ховер кнопок) */
+        .cmd-stop:hover { background: rgba(255, 68, 68, 0.05) !important; border-color: #ff4444 !important; color: #ff4444 !important; }
+
+        /* Включаем яркую заливку только в момент щелчка мышью */
+        .cmd-stop:active { background: #ff4444 !important; color: #fff !important; box-shadow: 0 0 15px #ff4444; }
+        .btn-save-net { border-color: #00ff88; color: #00ff88; background: rgba(0, 255, 136, 0.05); font-size: 16px; letter-spacing: 1px; }
+        .test-header { color: #00ff88; font-size: 13px; text-align: center; text-transform: uppercase; margin-bottom: 20px; font-weight: bold; }
+        .test-controls { display: flex; align-items: center; justify-content: space-between; margin-top: 25px; }
+        .cycle-label { font-size: 11px; color: #aaa; margin-right: 8px; width: 100px; text-align: left; }
+        .btn-run { width: 140px; border-color: #00ff88; color: #00ff88; font-weight: bold; justify-content: center; }
+        .btn-reset { width: 100px; font-size: 11px; border-color: #555; color: #888; justify-content: center; }
+        .test-table { width: 100%; border-collapse: collapse; background: #1a1b1e; margin-top: 25px; }
+        .test-table th { color: #00ff88; font-size: 10px; padding: 12px; border-bottom: 1px solid #333; text-align: left; }
+        .test-table td { padding: 15px 12px; border-bottom: 1px solid #252629; text-align: left; }
+        .net-header { color: #00ff88; font-size: 13px; text-align: center; text-transform: uppercase; margin-bottom: 20px; font-weight: bold; }
+        .net-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .net-label { font-size: 12px; color: #ccc; text-transform: uppercase; }
+        .win-ip-box { display: inline-flex; align-items: center; background: #fff; border: 1px solid #7a7a7a; padding: 4px 8px; min-width: 220px; justify-content: center; }
+        .win-ip-box input.ip-seg { width: 40px; border: none; outline: none; background: transparent; color: #000; font-size: 18px; text-align: center; font-family: monospace; }
+        .win-ip-box span { color: #000; font-weight: bold; font-size: 18px; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+        .ind { width: 10px; height: 10px; border-radius: 50%; background: #444; transition: 0.2s; }
+        .ind.trig { background: #ff4444; box-shadow: 0 0 10px #ff4444; }
+        /* 1. Базовый вид кнопки ПЕРЕЙТИ К ТОЧКЕ (делаем ее прозрачной с контуром, как остальные) */
+        .btn-go { background: transparent; color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.3); font-weight: bold; padding: 10px 20px; border-radius: 4px; transition: 0.1s; }
+        .btn-go:disabled { background: transparent; border-color: #444; color: #666; cursor: not-allowed; }
+
+        /* 2. ЗЕЛЕНЫЕ КНОПКИ: Пуск, Перейти, Применить, Сохранить (Дискета) */
+        /* При наведении - легкий зеленый фон и яркая рамка */
+        .btn-run:hover, .btn-go:hover, .btn-save-net:hover, .btn-save-custom:hover {
+            background: rgba(0, 255, 136, 0.05) !important;
+            border-color: #00ff88 !important;
+            color: #00ff88 !important;
+        }
+        /* При клике - полная заливка и свечение */
+        .btn-run:active, .btn-go:active, .btn-save-net:active, .btn-save-custom:active {
+            background: #00ff88 !important;
+            color: #1a1b1e !important;
+            box-shadow: 0 0 15px #00ff88 !important;
+        }
+
+        /* 3. КРАСНАЯ КНОПКА: Сбросить (Крестик) */
+        .btn-delete-custom:hover {
+            background: rgba(255, 68, 68, 0.05) !important;
+            border-color: #ff4444 !important;
+            color: #ff4444 !important;
+        }
+        .btn-delete-custom:active {
+            background: #ff4444 !important;
+            color: #fff !important;
+            box-shadow: 0 0 15px #ff4444 !important;
+        }
+    </style>
+</head>
+<body>
+<div class='main-panel'>
+    <div class='header-area'>
+        <h3 style='display:flex; justify-content:center; align-items:center; gap:15px;'>
+            ВАРИОФОКУС<span> 6.0</span>
+            <svg id='conn-icon' viewBox='0 0 409.521 409.52' style='width:28px; height:28px; fill:#ff4444; filter:drop-shadow(0 0 6px #ff4444); transition:0.3s;'>
+                <g>
+                    <path d="M74.114,257.859C33.246,257.859,0,291.096,0,331.958c0,40.869,33.246,74.113,74.114,74.113 c40.869,0,74.115-33.244,74.115-74.113C148.229,291.096,114.983,257.859,74.114,257.859z M74.114,373.17 c-22.723,0-41.214-18.49-41.214-41.213c0-22.717,18.491-41.199,41.214-41.199c22.724,0,41.214,18.482,41.214,41.199 C115.327,354.68,96.837,373.17,74.114,373.17z"/>
+                    <path d="M23.358,123.06c-9.085,0-16.45,7.366-16.45,16.45c0,9.085,7.365,16.45,16.45,16.45 c128.831,0,233.652,104.822,233.652,233.662c0,9.084,7.366,16.449,16.451,16.449c9.084,0,16.449-7.365,16.449-16.449 C289.91,242.637,170.333,123.06,23.358,123.06z"/>
+                    <path d="M23.358,3.45c-9.085,0-16.45,7.366-16.45,16.45c0,9.085,7.365,16.45,16.45,16.45 c194.792,0,353.263,158.479,353.263,353.272c0,9.084,7.364,16.449,16.449,16.449c9.084,0,16.45-7.365,16.45-16.449 C409.521,176.684,236.287,3.45,23.358,3.45z"/>
+                </g>
+            </svg>
+        </h3>
+    </div>
+    <div id='sys-warning' style='display: none; width: 90%; max-width: 1100px; margin: 20px auto 0 auto; border: 1px solid #ff4444; background: rgba(255,68,68,0.1); padding: 15px; border-radius: 8px; text-align: center;'>
+        <span style='color:#ff4444; font-weight:bold; font-size:18px; letter-spacing:1px;'>⚠ ВНИМАНИЕ: СИСТЕМА НЕ ОТКАЛИБРОВАНА</span><br>
+        <span style='font-size:15px; color:#e0e0e0; display:inline-block; margin-top:5px;'>Для разблокировки ручного управления проведите тест оборудования (кнопка ПУСК)</span>
+    </div>
+
+    <div class='content-area'>
+
+        <div class='column'>
+            <div class='section'>
+                <div class='section-title'>Режим управления</div>
+                <div class='grid-3'>
+                    <button id='md0' onclick='send(161)' style='justify-content:center;'>MVS</button>
+                    <button id='md1' onclick='send(162)' style='justify-content:center;'>PLC</button>
+                    <button id='md2' onclick='send(163)' style='justify-content:center;'>WEB</button>
+                </div>
+            </div>
+            <div class='section'>
+                <div class='section-title'>ОПТИЧЕСКИЕ ПРИВОДЫ</div>
+                <div class='grid-3'>
+                    <button id='mt0' class='btn-motor' onclick='send(1)'><div class='ind' id='s0'></div> ДИАФРАГМА <div class='ind' id='s1'></div></button>
+                    <button id='mt1' class='btn-motor' onclick='send(2)'><div class='ind' id='s2'></div> РЕЗКОСТЬ <div class='ind' id='s3'></div></button>
+                    <button id='mt2' class='btn-motor' onclick='send(3)'><div class='ind' id='s4'></div> ФОКУС <div class='ind' id='s5'></div></button>
+                </div>
+            </div>
+            <div class='section'>
+                <div class='section-title'>ШАГ НАСТРОЙКИ</div>
+                <div class='grid-2' style='margin-top: 30px;'>
+                    <button class='cmd-neg' id='c5' onclick='send(5)' style='font-size:26px;'>↶ 16</button>
+                    <button class='cmd-pos' id='c15' onclick='send(15)' style='font-size:26px;'>16 ↷</button>
+                </div>
+                <div class='grid-4' style='margin-bottom:12px;'>
+                    <button class='cmd-neg' id='c6' onclick='send(6)'>↶ 8</button>
+                    <button class='cmd-neg' id='c7' onclick='send(7)'>↶ 4</button>
+                    <button class='cmd-pos' id='c13' onclick='send(13)'>4 ↷</button>
+                    <button class='cmd-pos' id='c14' onclick='send(14)'>8 ↷</button>
+                </div>
+                <div class='grid-4'>
+                    <button class='cmd-neg' id='c8' onclick='send(8)'>↶ 2</button>
+                    <button class='cmd-neg' id='c9' onclick='send(9)'>↶ 1</button>
+                    <button class='cmd-pos' id='c11' onclick='send(11)'>1 ↷</button>
+                    <button class='cmd-pos' id='c12' onclick='send(12)'>2 ↷</button>
+                </div>
+            </div>
+        </div>
+
+        <div class='column right-column'>
+            <div class='test-header'>Тест оборудования</div>
+            <div class='grid-3'>
+                <label><input type='checkbox' id='tm0'> ДИАФРАГМА</label>
+                <label><input type='checkbox' id='tm1'> РЕЗКОСТЬ</label>
+                <label><input type='checkbox' id='tm2'> ФОКУС</label>
+            </div>
+            <div class='test-controls'>
+                <div style='display:flex; align-items:center;'>
+                    <span class='cycle-label'>КОЛИЧЕСТВО ЦИКЛОВ:</span>
+                    <input type='number' id='t_cycles' value='1' style='width:50px; background:#1a1b1e; color:#fff; border:1px solid #444; padding:8px; text-align:center;'>
+                </div>
+                <button class='btn-run' onclick='runTest()'>ПУСК</button>
+                <button id='resetBtn' class='btn-reset' onclick='send(250)'>СБРОС</button>
+            </div>
+
+            <div style='margin-top: 15px;'>
+                <button class='btn-final cmd-stop' id='c10' onclick='send(10)' style='height: 50px; font-size: 18px;'>⛔ СТОП</button>
+            </div>
+
+            <table class='test-table'>
+                <thead><tr><th>ДВИГАТЕЛЬ</th><th>ВСЕГО ШАГОВ</th><th>СРЕДНЕЕ</th></tr></thead>
+                <tbody>
+                <tr><td>ДИАФРАГМА</td><td id='tot0' style='color:#fff;'>0</td><td id='avg0' style='color:#00ff88;'>0</td></tr>
+                <tr><td>РЕЗКОСТЬ</td><td id='tot1' style='color:#fff;'>0</td><td id='avg1' style='color:#00ff88;'>0</td></tr>
+                <tr><td>ФОКУС</td><td id='tot2' style='color:#fff;'>0</td><td id='avg2' style='color:#00ff88;'>0</td></tr>
+                </tbody>
+            </table>
+
+            <div class='section' style='margin-top:30px; border-top:1px solid #404040; padding-top:25px;'>
+                <div class='test-header'>СОХРАНЕННЫЕ ПОЗИЦИИ</div>
+                <div id='preset-container' style='display:flex; flex-direction:column; gap:15px;'>
+
+                    <div class='preset-card' id='pcard0'>
+                        <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;'>
+                            <input type='text' id='in_n0' placeholder='Название позиции...' onfocus='if(this.value.includes("ПУСТО")) this.value=""' onchange='sendName(151, this.value)' class='preset-name-input' style='width:70%;'>
+                            <span style='font-size:10px; color:#666;'>СЛОТ 1</span>
+                        </div>
+                        <div style='display:grid; grid-template-columns: 1fr 50px 50px; gap:10px;'>
+                            <button id='pr0' onclick='send(171)' class='btn-go' style='justify-content:center; padding: 8px 5px;'>ПЕРЕЙТИ К ТОЧКЕ</button>
+                            <button onclick='send(181)' title='Записать' class='btn-save-custom' style='justify-content:center; padding: 8px 5px;'>💾</button>
+                            <button onclick='send(191)' title='Сбросить' class='btn-delete-custom' style='justify-content:center; padding: 8px 5px;'>✕</button>
+                        </div>
+                    </div>
+
+                    <div class='preset-card' id='pcard1'>
+                        <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;'>
+                            <input type='text' id='in_n1' placeholder='Название позиции...' onfocus='if(this.value.includes("ПУСТО")) this.value=""' onchange='sendName(152, this.value)' class='preset-name-input' style='width:70%;'>
+                            <span style='font-size:10px; color:#666;'>СЛОТ 2</span>
+                        </div>
+                        <div style='display:grid; grid-template-columns: 1fr 50px 50px; gap:10px;'>
+                            <button id='pr1' onclick='send(172)' class='btn-go' style='justify-content:center; padding: 8px 5px;'>ПЕРЕЙТИ К ТОЧКЕ</button>
+                            <button onclick='send(182)' title='Записать' class='btn-save-custom' style='justify-content:center; padding: 8px 5px;'>💾</button>
+                            <button onclick='send(192)' title='Сбросить' class='btn-delete-custom' style='justify-content:center; padding: 8px 5px;'>✕</button>
+                        </div>
+                    </div>
+
+                    <div class='preset-card' id='pcard2'>
+                        <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;'>
+                            <input type='text' id='in_n2' placeholder='Название позиции...' onfocus='if(this.value.includes("ПУСТО")) this.value=""' onchange='sendName(153, this.value)' class='preset-name-input' style='width:70%;'>
+                            <span style='font-size:10px; color:#666;'>СЛОТ 3</span>
+                        </div>
+                        <div style='display:grid; grid-template-columns: 1fr 50px 50px; gap:10px;'>
+                            <button id='pr2' onclick='send(173)' class='btn-go' style='justify-content:center; padding: 8px 5px;'>ПЕРЕЙТИ К ТОЧКЕ</button>
+                            <button onclick='send(183)' title='Записать' class='btn-save-custom' style='justify-content:center; padding: 8px 5px;'>💾</button>
+                            <button onclick='send(193)' title='Сбросить' class='btn-delete-custom' style='justify-content:center; padding: 8px 5px;'>✕</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class='section' style='margin-top:30px; border-top:1px solid #404040; padding-top:25px;'>
+                <div class='net-header'>Сетевые настройки</div>
+                <div class='net-row'>
+                    <span class='net-label'>IP Адрес:</span>
+                    <div class='win-ip-box' id='ip_wrap'>
+                        <input type='number' class='ip-seg' placeholder='192'><span>.</span>
+                        <input type='number' class='ip-seg' placeholder='168'><span>.</span>
+                        <input type='number' class='ip-seg' placeholder='1'><span>.</span>
+                        <input type='number' class='ip-seg' placeholder='177'>
+                    </div>
+                </div>
+                <div class='net-row'>
+                    <span class='net-label'>Маска подсети:</span>
+                    <div class='win-ip-box' id='sn_wrap'>
+                        <input type='number' class='ip-seg' placeholder='255'><span>.</span>
+                        <input type='number' class='ip-seg' placeholder='255'><span>.</span>
+                        <input type='number' class='ip-seg' placeholder='255'><span>.</span>
+                        <input type='number' class='ip-seg' placeholder='0'>
+                    </div>
+                </div>
+                <div class='net-row'>
+                    <span class='net-label'>Основной шлюз:</span>
+                    <div class='win-ip-box' id='gw_wrap'>
+                        <input type='number' class='ip-seg' placeholder='192'><span>.</span>
+                        <input type='number' class='ip-seg' placeholder='168'><span>.</span>
+                        <input type='number' class='ip-seg' placeholder='1'><span>.</span>
+                        <input type='number' class='ip-seg' placeholder='1'>
+                    </div>
+                </div>
+            </div>
+            <div class='action-area'>
+                <button class='btn-final btn-save-net' onclick='saveNet()'>💾 ПРИМЕНИТЬ И ПЕРЕЗАГРУЗИТЬ</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+<script>
+    let lastSid = null;
+    let expectedTimeout = false;
+    let isTestActive = false;
+    let lastActionTime = 0; // [НОВОЕ] Время последнего клика пользователя
+
+    function sendName(cmd, val) {
+        fetch('/api?cmd=' + cmd + '&name=' + encodeURIComponent(val));
+    }
+
+    function send(c) {
+        lastActionTime = Date.now(); // [НОВОЕ] Запоминаем точное время команды в миллисекундах
+
+        if (c >= 171 && c <= 173) expectedTimeout = true;
+        fetch('/api?cmd='+c)
+            .then(r => r.json())
+            .then(update)
+            .catch(e => console.log("Ожидание мотора..."));
+    }
+
+    function update(d) {
+        expectedTimeout = false; // Плата освободилась, снимаем маску
+        isTestActive = (d.tA === 1); // Запоминаем статус теста (1 = идет, 0 = стоп)
+
+        if (lastSid === null) lastSid = d.sid;
+        else if (lastSid !== d.sid) { window.location.reload(); return; }
+
+        for (let i = 0; i < 3; i++) {
+            if(document.getElementById('tot' + i)) document.getElementById('tot' + i).innerText = d.tot[i];
+            if(document.getElementById('avg' + i)) document.getElementById('avg' + i).innerText = d.avg[i];
+
+            let btnGo = document.getElementById('pr' + i);
+            let card = document.getElementById('pcard' + i);
+            if (d.pr === i) {
+                // Оставляем только подсветку рамки самой карточки
+                if(card) card.style.borderColor = '#00ff88';
+            } else {
+                if(card) card.style.borderColor = '#333';
+            }
+
+            let input = document.getElementById('in_n' + i);
+            if (!input || document.activeElement === input) continue;
+
+            let sName = d['n' + (i + 1)];
+            let pos0 = (d.pos && d.pos[i]) ? d.pos[i][0] : 0;
+
+            let isEmpty = (pos0 === 999999);
+
+            if (isEmpty) {
+                input.value = " ( ПУСТО ) ";
+                input.style.color = "#666";
+                input.style.fontStyle = "italic";
+            } else {
+                input.value = (sName && sName.trim() !== "") ? sName : "П" + (i + 1);
+                input.style.color = "#00ff88";
+                input.style.fontStyle = "normal";
+            }
+        }
+
+        document.querySelectorAll('.active-mode, .active-motor, .active-step').forEach(b => {
+            b.classList.remove('active-mode', 'active-motor', 'active-step');
+        });
+
+        let modeBtn = document.getElementById('md' + d.mode);
+        if (modeBtn) modeBtn.classList.add('active-mode');
+
+        const runBtn = document.querySelector('.btn-run');
+        if (d.tA === 1) {
+            for (let i = 0; i < 3; i++) {
+                if (d.tM & (1 << i)) {
+                    let mBtn = document.getElementById('mt' + i);
+                    if(mBtn) mBtn.classList.add('active-motor');
+                }
+            }
+            if (runBtn) { runBtn.innerText = 'ЦИКЛЫ: ' + d.rem; runBtn.style.background = '#444'; }
+        } else {
+            if (d.mode === 2 && d.motor >= 0) {
+                let mBtn = document.getElementById('mt' + d.motor);
+                if(mBtn) mBtn.classList.add('active-motor');
+            }
+
+            // [JS: Защита кнопок шагов] Проверяем режим работы и готовность мотора
+            let isWebMode = (d.mode === 2); // 2 - это режим WEB
+            let isMotorReady = (d.motor >= 0 && d.cal && d.cal[d.motor] === 1);
+            let stepButtons = document.querySelectorAll('.cmd-pos, .cmd-neg');
+
+            // Блокируем кнопки, если включен НЕ ручной режим (MVS/PLC) ИЛИ мотор не откалиброван
+            if (!isWebMode || !isMotorReady) {
+                stepButtons.forEach(b => {
+                    b.style.opacity = '0.3';
+                    b.style.pointerEvents = 'none'; // Полностью отключаем реакцию на клики
+                });
+            } else {
+                stepButtons.forEach(b => {
+                    b.style.opacity = '1';
+                    b.style.pointerEvents = 'auto';
+                });
+
+                // if (d.cmd >= 5 && d.cmd <= 15 && d.cmd !== 10) {
+                //   let cmdBtn = document.getElementById('c' + d.cmd);
+                // if (cmdBtn) cmdBtn.classList.add('active-step');
+                //}
+            }
+
+            if (runBtn) { runBtn.innerText = 'ПУСК'; runBtn.style.background = ''; }
+
+            const resetBtn = document.getElementById('resetBtn');
+            if (resetBtn) {
+                let hasData = d.tot.some(v => v > 0) || d.avg.some(v => v > 0);
+                if (hasData) {
+                    resetBtn.style.borderColor = '#ff4444';
+                    resetBtn.style.color = '#ff4444';
+                    resetBtn.style.background = 'rgba(255,68,68,0.05)';
+                } else {
+                    resetBtn.style.borderColor = '#555';
+                    resetBtn.style.color = '#888';
+                    resetBtn.style.background = '';
+                }
+            }
+        }
+
+        // [JS: Управление показом таблички "ВНИМАНИЕ" (переезд интерфейса)]
+        let sysWarning = document.getElementById('sys-warning');
+        if (sysWarning && d.cal) {
+            let needsCalibration = (d.cal[0] === 0 || d.cal[1] === 0 || d.cal[2] === 0);
+            sysWarning.style.display = needsCalibration ? 'block' : 'none';
+        }
+
+        for (let i = 0; i < 6; i++) {
+            let ind = document.getElementById('s' + i);
+            if (ind) d.s[i] === 1 ? ind.classList.add('trig') : ind.classList.remove('trig');
+        }
+
+        if (d.ip && d.sn && d.gw) {
+            let ipNodes = document.querySelectorAll('#ip_wrap .ip-seg');
+            let snNodes = document.querySelectorAll('#sn_wrap .ip-seg');
+            let gwNodes = document.querySelectorAll('#gw_wrap .ip-seg');
+            for (let i = 0; i < 4; i++) {
+                if (ipNodes[i]) ipNodes[i].placeholder = d.ip[i];
+                if (snNodes[i]) snNodes[i].placeholder = d.sn[i];
+                if (gwNodes[i]) gwNodes[i].placeholder = d.gw[i];
+            }
+        }
+    }
+
+    document.querySelectorAll('.ip-seg').forEach((input, idx, allInputs) => {
+        input.addEventListener('input', function() {
+            if (this.value.length >= 3) {
+                this.value = this.value.slice(0, 3);
+                if (parseInt(this.value) > 255) this.value = 255;
+                if (allInputs[idx + 1]) allInputs[idx + 1].focus();
+            }
+        });
+        input.addEventListener('keydown', function(e) {
+            if (e.key === '.' || e.key === 'ArrowRight') { e.preventDefault(); if (allInputs[idx + 1]) allInputs[idx + 1].focus(); }
+            if (e.key === 'ArrowLeft') { if (allInputs[idx - 1]) allInputs[idx - 1].focus(); }
+            if (e.key === 'Backspace' && this.value.length === 0) { if (allInputs[idx - 1]) allInputs[idx - 1].focus(); }
+        });
+        input.addEventListener('click', function() { this.select(); });
+    });
+
+    function assembleIP(wrapperId) {
+        const segs = document.querySelectorAll(`#${wrapperId} .ip-seg`);
+        return Array.from(segs).map(s => s.value || s.placeholder).join('.');
+    }
+
+    function saveNet() {
+        const ip = assembleIP('ip_wrap'), sn = assembleIP('sn_wrap'), gw = assembleIP('gw_wrap');
+        if(confirm(`Перезагрузить?\nIP: ${ip}\nMask: ${sn}\nGW: ${gw}`)) {
+            fetch(`/api?cmd=300&ip=${ip}&gw=${gw}&sn=${sn}`).then(() => {
+                alert('Контроллер перезагружается. Нажмите ОК для перехода на новый адрес: ' + ip);
+                window.location.href = 'http://' + ip;
+            });
+        }
+    }
+
+    function runTest() {
+        let m = (document.getElementById('tm0').checked ? 1 : 0) | (document.getElementById('tm1').checked ? 2 : 0) | (document.getElementById('tm2').checked ? 4 : 0);
+        let c = document.getElementById('t_cycles').value;
+        fetch(`/api?cmd=200&m=${m}&c=${c}`).then(r=>r.json()).then(update);
+    }
+
+    function poll() {
+        // Создаем контроллер для принудительного обрыва зависших запросов
+        const controller = new AbortController();
+        // Жесткий таймер: если плата не ответит за 1.5 секунды - убиваем запрос
+        const timeoutId = setTimeout(() => controller.abort(), 1500);
+
+        // Передаем сигнал контроллера в функцию fetch
+        fetch('/api?cmd=0', { signal: controller.signal })
+            .then(r => {
+                clearTimeout(timeoutId); // Плата ответила вовремя!
+                return r.json();
+            })
+            .then(d => {
+                // [СВЯЗЬ: ОК] Пакет получен, красим иконку сети в зеленый
+                let icon = document.getElementById('conn-icon');
+                if(icon) {
+                    icon.style.fill = '#00ff88';
+                    icon.style.filter = 'drop-shadow(0 0 6px #00ff88)';
+                }
+
+                update(d);
+                setTimeout(poll, 2000); // Следующий опрос через 2 сек
+            })
+            .catch(e => {
+                // [СВЯЗЬ: ПОТЕРЯНА ИЛИ ПЛАТА ЗАНЯТА]
+                let icon = document.getElementById('conn-icon');
+                if(icon) {
+                    // Вычисляем, нажимал ли юзер кнопки в последние 3 секунды
+                    let isRecentlyActive = (typeof lastActionTime !== 'undefined') ? (Date.now() - lastActionTime < 3000) : false;
+
+                    // ХИТРОСТЬ: Оставляем зеленым, если система легально занята
+                    if (expectedTimeout || isTestActive || isRecentlyActive) {
+                        icon.style.fill = '#00ff88';
+                        icon.style.filter = 'drop-shadow(0 0 6px #00ff88)';
+                    } else {
+                        // Реальный обрыв связи (Красный цвет)
+                        icon.style.fill = '#ff4444';
+                        icon.style.filter = 'drop-shadow(0 0 6px #ff4444)';
+                    }
+                }
+                setTimeout(poll, 2000); // Пытаемся достучаться реже
+            });
+    }
+    poll();
+</script>
+</body></html>

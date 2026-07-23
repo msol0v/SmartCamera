@@ -113,11 +113,13 @@ static void ethernet_link_status_updated(struct netif *netif)
   if (netif_is_up(netif))
   {
 /* USER CODE BEGIN 5 */
+    printf("Ethernet link up\r\n");
 /* USER CODE END 5 */
   }
   else /* netif is down */
   {
 /* USER CODE BEGIN 6 */
+    printf("Ethernet link down\r\n");
 /* USER CODE END 6 */
   }
 }
