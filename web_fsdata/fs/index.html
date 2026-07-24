@@ -274,40 +274,86 @@
     let lastSid = null;
     let expectedTimeout = false;
     let isTestActive = false;
-    let lastActionTime = 0; // [НОВОЕ] Время последнего клика пользователя
+    let lastActionTime = 0;
 
-    function sendName(cmd, val) {
-        fetch('/api?cmd=' + cmd + '&name=' + encodeURIComponent(val));
-    }
+    // Универсальная функция отправки REST-команд по POST
+    function sendCommand(data) {
+        lastActionTime = Date.now();
 
-    function send(c) {
-        lastActionTime = Date.now(); // [НОВОЕ] Запоминаем точное время команды в миллисекундах
+        if (data.cmd >= 171 && data.cmd <= 173) {
+            expectedTimeout = true;
+        }
 
-        if (c >= 171 && c <= 173) expectedTimeout = true;
-        fetch('/api?cmd='+c)
-            .then(r => r.json())
+        fetch('/api/cmd', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+            .then(r => {
+                if (!r.ok) throw new Error('Network error');
+                return r.json();
+            })
             .then(update)
-            .catch(e => console.log("Ожидание мотора..."));
+            .catch(e => console.log("Ожидание ответа контроллера..."));
     }
 
+    // Сохранение имени пресета
+    function sendName(cmd, val) {
+        sendCommand({ cmd: cmd, name: val });
+    }
+
+    // Сохранение сетевых настроек
+    function saveNet() {
+        const ip = assembleIP('ip_wrap');
+        const sn = assembleIP('sn_wrap');
+        const gw = assembleIP('gw_wrap');
+
+        if (confirm(`Перезагрузить?\nIP: ${ip}\nMask: ${sn}\nGW: ${gw}`)) {
+            fetch('/api/network', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip, sn, gw })
+            })
+                .then(r => {
+                    alert('Контроллер перезагружается. Нажмите ОК для перехода на новый адрес: ' + ip);
+                    window.location.href = 'http://' + ip;
+                })
+                .catch(e => alert('Ошибка отправки сетевых настроек'));
+        }
+    }
+
+    // Запуск теста
+    function runTest() {
+        let m = (document.getElementById('tm0').checked ? 1 : 0)
+            | (document.getElementById('tm1').checked ? 2 : 0)
+            | (document.getElementById('tm2').checked ? 4 : 0);
+        let c = parseInt(document.getElementById('t_cycles').value, 10) || 1;
+
+        sendCommand({ cmd: 200, m: m, c: c });
+    }
+
+    // Замена функции send(c) для совместимости с инлайн-событиями onclick="send(...)"
+    function send(c) {
+        sendCommand({ cmd: c });
+    }
+
+    // Обновление UI на основе полученного JSON-объекта
     function update(d) {
-        expectedTimeout = false; // Плата освободилась, снимаем маску
-        isTestActive = (d.tA === 1); // Запоминаем статус теста (1 = идет, 0 = стоп)
+        expectedTimeout = false;
+        isTestActive = (d.tA === 1);
 
         if (lastSid === null) lastSid = d.sid;
         else if (lastSid !== d.sid) { window.location.reload(); return; }
 
         for (let i = 0; i < 3; i++) {
-            if(document.getElementById('tot' + i)) document.getElementById('tot' + i).innerText = d.tot[i];
-            if(document.getElementById('avg' + i)) document.getElementById('avg' + i).innerText = d.avg[i];
+            if (document.getElementById('tot' + i)) document.getElementById('tot' + i).innerText = d.tot[i];
+            if (document.getElementById('avg' + i)) document.getElementById('avg' + i).innerText = d.avg[i];
 
-            let btnGo = document.getElementById('pr' + i);
             let card = document.getElementById('pcard' + i);
             if (d.pr === i) {
-                // Оставляем только подсветку рамки самой карточки
-                if(card) card.style.borderColor = '#00ff88';
+                if (card) card.style.borderColor = '#00ff88';
             } else {
-                if(card) card.style.borderColor = '#333';
+                if (card) card.style.borderColor = '#333';
             }
 
             let input = document.getElementById('in_n' + i);
@@ -315,7 +361,6 @@
 
             let sName = d['n' + (i + 1)];
             let pos0 = (d.pos && d.pos[i]) ? d.pos[i][0] : 0;
-
             let isEmpty = (pos0 === 999999);
 
             if (isEmpty) {
@@ -341,37 +386,30 @@
             for (let i = 0; i < 3; i++) {
                 if (d.tM & (1 << i)) {
                     let mBtn = document.getElementById('mt' + i);
-                    if(mBtn) mBtn.classList.add('active-motor');
+                    if (mBtn) mBtn.classList.add('active-motor');
                 }
             }
             if (runBtn) { runBtn.innerText = 'ЦИКЛЫ: ' + d.rem; runBtn.style.background = '#444'; }
         } else {
             if (d.mode === 2 && d.motor >= 0) {
                 let mBtn = document.getElementById('mt' + d.motor);
-                if(mBtn) mBtn.classList.add('active-motor');
+                if (mBtn) mBtn.classList.add('active-motor');
             }
 
-            // [JS: Защита кнопок шагов] Проверяем режим работы и готовность мотора
-            let isWebMode = (d.mode === 2); // 2 - это режим WEB
+            let isWebMode = (d.mode === 2);
             let isMotorReady = (d.motor >= 0 && d.cal && d.cal[d.motor] === 1);
             let stepButtons = document.querySelectorAll('.cmd-pos, .cmd-neg');
 
-            // Блокируем кнопки, если включен НЕ ручной режим (MVS/PLC) ИЛИ мотор не откалиброван
             if (!isWebMode || !isMotorReady) {
                 stepButtons.forEach(b => {
                     b.style.opacity = '0.3';
-                    b.style.pointerEvents = 'none'; // Полностью отключаем реакцию на клики
+                    b.style.pointerEvents = 'none';
                 });
             } else {
                 stepButtons.forEach(b => {
                     b.style.opacity = '1';
                     b.style.pointerEvents = 'auto';
                 });
-
-                // if (d.cmd >= 5 && d.cmd <= 15 && d.cmd !== 10) {
-                //   let cmdBtn = document.getElementById('c' + d.cmd);
-                // if (cmdBtn) cmdBtn.classList.add('active-step');
-                //}
             }
 
             if (runBtn) { runBtn.innerText = 'ПУСК'; runBtn.style.background = ''; }
@@ -391,7 +429,6 @@
             }
         }
 
-        // [JS: Управление показом таблички "ВНИМАНИЕ" (переезд интерфейса)]
         let sysWarning = document.getElementById('sys-warning');
         if (sysWarning && d.cal) {
             let needsCalibration = (d.cal[0] === 0 || d.cal[1] === 0 || d.cal[2] === 0);
@@ -436,65 +473,43 @@
         return Array.from(segs).map(s => s.value || s.placeholder).join('.');
     }
 
-    function saveNet() {
-        const ip = assembleIP('ip_wrap'), sn = assembleIP('sn_wrap'), gw = assembleIP('gw_wrap');
-        if(confirm(`Перезагрузить?\nIP: ${ip}\nMask: ${sn}\nGW: ${gw}`)) {
-            fetch(`/api?cmd=300&ip=${ip}&gw=${gw}&sn=${sn}`).then(() => {
-                alert('Контроллер перезагружается. Нажмите ОК для перехода на новый адрес: ' + ip);
-                window.location.href = 'http://' + ip;
-            });
-        }
-    }
-
-    function runTest() {
-        let m = (document.getElementById('tm0').checked ? 1 : 0) | (document.getElementById('tm1').checked ? 2 : 0) | (document.getElementById('tm2').checked ? 4 : 0);
-        let c = document.getElementById('t_cycles').value;
-        fetch(`/api?cmd=200&m=${m}&c=${c}`).then(r=>r.json()).then(update);
-    }
-
+    // REST Polling через GET /api/state
     function poll() {
-        // Создаем контроллер для принудительного обрыва зависших запросов
         const controller = new AbortController();
-        // Жесткий таймер: если плата не ответит за 1.5 секунды - убиваем запрос
         const timeoutId = setTimeout(() => controller.abort(), 1500);
 
-        // Передаем сигнал контроллера в функцию fetch
-        fetch('/api?cmd=0', { signal: controller.signal })
+        fetch('/api/state', { method: 'GET', signal: controller.signal })
             .then(r => {
-                clearTimeout(timeoutId); // Плата ответила вовремя!
+                clearTimeout(timeoutId);
+                if (!r.ok) throw new Error('HTTP error');
                 return r.json();
             })
             .then(d => {
-                // [СВЯЗЬ: ОК] Пакет получен, красим иконку сети в зеленый
                 let icon = document.getElementById('conn-icon');
-                if(icon) {
+                if (icon) {
                     icon.style.fill = '#00ff88';
                     icon.style.filter = 'drop-shadow(0 0 6px #00ff88)';
                 }
-
                 update(d);
-                setTimeout(poll, 2000); // Следующий опрос через 2 сек
+                setTimeout(poll, 2000);
             })
             .catch(e => {
-                // [СВЯЗЬ: ПОТЕРЯНА ИЛИ ПЛАТА ЗАНЯТА]
                 let icon = document.getElementById('conn-icon');
-                if(icon) {
-                    // Вычисляем, нажимал ли юзер кнопки в последние 3 секунды
+                if (icon) {
                     let isRecentlyActive = (typeof lastActionTime !== 'undefined') ? (Date.now() - lastActionTime < 3000) : false;
 
-                    // ХИТРОСТЬ: Оставляем зеленым, если система легально занята
                     if (expectedTimeout || isTestActive || isRecentlyActive) {
                         icon.style.fill = '#00ff88';
                         icon.style.filter = 'drop-shadow(0 0 6px #00ff88)';
                     } else {
-                        // Реальный обрыв связи (Красный цвет)
                         icon.style.fill = '#ff4444';
                         icon.style.filter = 'drop-shadow(0 0 6px #ff4444)';
                     }
                 }
-                setTimeout(poll, 2000); // Пытаемся достучаться реже
+                setTimeout(poll, 2000);
             });
     }
+
     poll();
 </script>
 </body></html>
