@@ -37,6 +37,9 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 
+// Выставляется чтобы пользоваться dhcp. В кубах почему-то нельзя задать статик и включить dhcp модуль одновременно
+#define LWIP_DHCP 1
+
   typedef enum
   {
     CONTROL_MODE_MVS,
@@ -57,20 +60,31 @@ extern "C" {
     TEST_MOTOR_ALL = 7
   }TestMotorsMask_t;
 
-  /* Структура состояния платки */
-  typedef struct {
-    uint32_t sessionID;
-    ControlMode_t controlMode;
-    uint8_t isActiveAutoTest;
-    TestMotorsMask_t testMotorsMask;
-    uint8_t testCyclesLeft;
-    uint8_t currentPreset;
-    uint32_t totalStepsMotors[3];
-    uint32_t avgStepsMotors[3];
-    uint8_t isMotorsCalibrated;
-    uint8_t stateGercons[6];
-    uint32_t presetPositions[3][3];
-  }State_t;
+// Структура состояния системы
+typedef struct {
+  uint32_t sessionID;
+  uint8_t controlMode;        // 0: MVS, 1: PLC, 2: WEB
+  int8_t selectedMotor;       // 0: Диафрагма, 1: Резкость, 2: Фокус (-1 если не выбран)
+  int8_t lastCmd;             // Последняя выполненная команда
+  uint8_t isActiveAutoTest;   // 1 - идет тест, 0 - стоп
+  uint8_t testMotorsMask;     // Битовая маска моторов для теста
+  uint8_t testCyclesLeft;     // Оставшееся количество циклов
+  int8_t currentPreset;       // Текущий пресет (-1 если не активен)
+
+  uint32_t totalStepsMotors[3];
+  uint32_t avgStepsMotors[3];
+  uint8_t isMotorsCalibrated[3]; // флаги калибровки
+  uint8_t stateGercons[6];    // Состояние 6 концевиков (0 или 1)
+
+  int32_t presetPositions[3][3]; // [слот][мотор] (999999 - если пустой)
+  char presetNames[3][64];
+
+  uint8_t ip[4];
+  uint8_t netmask[4];
+  uint8_t gateway[4];
+} BoardState_t;
+
+  extern volatile BoardState_t bState;
 
   extern volatile ControlMode_t controlMode;
 

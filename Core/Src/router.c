@@ -1,22 +1,51 @@
-//
-// Created by msol0v on 24.07.2026.
-//
-
 #include "router.h"
-
 #include <stdio.h>
+#include <string.h>
 #include "lwip/apps/httpd.h"
 #include "api.h"
-
-#include <string.h>
-
 #include "fs.h"
 
-static void http_write_json(struct fs_file *file, const char *json){
-    const int json_len = strlen(json);
-    static char response[512];
+// Буфер для сборки параметров
+static char g_cgi_query_string[256];
 
-    file->len = snprintf(response, sizeof(response),
+// CGI Callback: вызывается LwIP, когда приходит запрос на /api?cmd=...
+static const char *CGI_ApiHandler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
+{
+    // Восстанавливаем query-строку обратно из массива CGI параметров
+    g_cgi_query_string[0] = '\0';
+    strcat(g_cgi_query_string, "?");
+
+    for (int i = 0; i < iNumParams; i++) {
+        if (i > 0) strcat(g_cgi_query_string, "&");
+        strcat(g_cgi_query_string, pcParam[i]);
+        if (pcValue[i] && strlen(pcValue[i]) > 0) {
+            strcat(g_cgi_query_string, "=");
+            strcat(g_cgi_query_string, pcValue[i]);
+        }
+    }
+
+    // Обрабатываем команду парсером
+    API_ProcessCommand(g_cgi_query_string);
+
+    // Возвращаем псевдо-путь, который LwIP сразу же откроет через fs_open_custom
+    return "/api/state";
+}
+
+// Регистрация обработчика CGI
+void Router_Init(void)
+{
+    static const tCGI cgi_handlers[] = {
+        { "/api", CGI_ApiHandler } // Автоматически перехватит все /api?cmd=...
+    };
+
+    http_set_cgi_handlers(cgi_handlers, 1);
+}
+
+static void http_write_json(struct fs_file *file, const char *json) {
+    const int json_len = strlen(json);
+    static char response[1024];
+
+    file->len = snprintf(response, 1024,
         "HTTP/1.1 200 OK\r\n"
         "Server: SmartCamera\r\n"
         "Content-Type: application/json\r\n"
@@ -34,8 +63,6 @@ static void http_write_json(struct fs_file *file, const char *json){
     file->is_custom_file = 1;
 }
 
-//  У товарищей из ST ошибка, если не выставить LWIP_HTTPD_DYNAMIC_FILE_READ, то будет assert подниматься
-// на работу вроде не влияет но бесит
 int fs_read_custom(struct fs_file *file, char *buffer, int count)
 {
     int bytes_left = file->len - file->index;
@@ -54,76 +81,21 @@ int fs_read_custom(struct fs_file *file, char *buffer, int count)
     return count;
 }
 
-
-/*Выставлен CustomFs. Будет вызываться этот колбек
- * для запросов GET
- */
 int fs_open_custom(struct fs_file *file, const char *name)
 {
+    static char json_buffer[1024];
 
-    char json[128];
-
-
-    printf("%s\r\n", name);
-
-    if(strcmp(name, "/api/state") == 0)
+    // Вызывается как для прямого /api/state, так и после возврата из CGI_ApiHandler
+    if (strcmp(name, "/api/state") == 0 || strcmp(name, "/api") == 0)
     {
-        API_GET_State(json);
-        http_write_json(file, json);
+        API_GET_State(json_buffer, sizeof(json_buffer));
+        http_write_json(file, json_buffer);
         return 1;
-    }
-
-    if(strcmp(name,"/api/mode")==0)
-    {
-        //API_GET_Mode(json);
-        //http_write_json(file, json);
-        //return 1;
     }
 
     return 0;
 }
 
 void fs_close_custom(struct fs_file *file) {
-    // Закрывать нечего, просто заглушка
-}
-
-/* Колбек для запросов POST
- */
-err_t httpd_post_begin(void *connection, const char *uri, const char *http_request,
-                       u16_t http_request_len, int content_len, char *response_uri,
-                       u16_t response_uri_len, u8_t *post_auto_wnd)
-{
-    LWIP_UNUSED_ARG(connection);
-    LWIP_UNUSED_ARG(http_request);
-    LWIP_UNUSED_ARG(http_request_len);
-    LWIP_UNUSED_ARG(content_len);
-    LWIP_UNUSED_ARG(response_uri);
-    LWIP_UNUSED_ARG(response_uri_len);
-
-    *post_auto_wnd = 1;
-
-    printf("POST BEGIN: %s\r\n", uri);
-
-    return ERR_OK;
-}
-
-err_t httpd_post_receive_data(void *connection,
-                              struct pbuf *p)
-{
-    LWIP_UNUSED_ARG(connection);
-
-    printf("POST DATA (%d bytes)\r\n", p->tot_len);
-
-    return ERR_OK;
-}
-
-void httpd_post_finished(void *connection,
-                         char *response_uri,
-                         uint16_t response_uri_len)
-{
-    LWIP_UNUSED_ARG(connection);
-    LWIP_UNUSED_ARG(response_uri);
-    LWIP_UNUSED_ARG(response_uri_len);
-
-    printf("POST FINISHED\r\n");
+    // Заглушка
 }

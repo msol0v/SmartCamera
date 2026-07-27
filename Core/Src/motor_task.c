@@ -6,6 +6,14 @@
 #include "main.h"
 #include <stdio.h>
 
+osThreadId_t motorTaskHandle;
+
+const osThreadAttr_t motorTask_attributes = {
+    .name = "pwmTask",
+    .stack_size = 512 * 4,
+    .priority = (osPriority_t) osPriorityNormal,
+  };
+
 void MotorTask(void *argument)
 {
     MotorCommand_t cmd;

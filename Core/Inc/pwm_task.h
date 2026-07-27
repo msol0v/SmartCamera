@@ -5,7 +5,6 @@
 #ifndef SMARTCAMERA_PWM_TASK_H
 #define SMARTCAMERA_PWM_TASK_H
 
-#include "cmsis_os.h"
 #include "queue.h"
 #include "cmsis_os2.h"
 #include "main.h"

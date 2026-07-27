@@ -25,6 +25,7 @@
 /* USER CODE BEGIN Includes */
 #include "cli.h"
 #include "httpd.h"
+#include "motor_task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,6 +47,8 @@
 
 QSPI_HandleTypeDef hqspi;
 
+RNG_HandleTypeDef hrng;
+
 TIM_HandleTypeDef htim8;
 TIM_HandleTypeDef htim9;
 
@@ -59,6 +62,7 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
+volatile BoardState_t  bState;
 osMessageQueueId_t pwmQueueHandle;
 osMessageQueueId_t motorQueueHandle;
 /* USER CODE END PV */
@@ -70,10 +74,14 @@ static void MX_QUADSPI_Init(void);
 static void MX_UART7_Init(void);
 static void MX_TIM8_Init(void);
 static void MX_TIM9_Init(void);
+static void MX_RNG_Init(void);
 void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 void StartDhcpTask(void *argument);
+
+// Инициализация роутера
+extern void Router_Init(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -106,7 +114,7 @@ void StartDhcpTask(void *argument) {
       ip[2] = ip4_addr3(&nif->ip_addr);
       ip[3] = ip4_addr4(&nif->ip_addr);
 
-      printf("\r\n[DHCP] Assigned IP: %d.%d.%d.%d\r\n>", ip[0], ip[1], ip[2], ip[3]);
+      printf("\r\nAssigned IP: %d.%d.%d.%d\r\n>", ip[0], ip[1], ip[2], ip[3]);
 
       // Самоликвидация задачи
       dhcpCheckTaskHandle = NULL;
@@ -122,6 +130,20 @@ void startDhcpCheckTask(void) {
   if (dhcpCheckTaskHandle == NULL) {
     dhcpCheckTaskHandle = osThreadNew(StartDhcpTask, NULL, &dhcpCheck_attributes);
   }
+}
+
+void DelayWithCountdown(uint32_t seconds)
+{
+  while (seconds > 0)
+  {
+    printf("\rWaiting... %2lu s ", seconds);
+    fflush(stdout);
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    seconds--;
+  }
+
+  printf("\rDone!            \n");
 }
 /* USER CODE END 0 */
 
@@ -158,6 +180,7 @@ int main(void)
   MX_UART7_Init();
   MX_TIM8_Init();
   MX_TIM9_Init();
+  MX_RNG_Init();
   /* USER CODE BEGIN 2 */
 
   // Конфигурируем QSPI для работы в MemoryMapped режиме
@@ -177,6 +200,31 @@ int main(void)
   //
   // HAL_StatusTypeDef status = HAL_QSPI_MemoryMapped(&hqspi, &cmd, &cfg);
   // printf("HAL_QSPI_MemoryMapped returned 0x%x\n", status);
+
+  /* Инициализация структуры состояния платы */
+
+  // Инициализируем нулями
+  memset(&bState, 0, sizeof(bState));
+
+  // Аппаратный рандом
+  HAL_RNG_GenerateRandomNumber(&hrng, &bState.sessionID);
+  // Стартуем с веба
+  bState.controlMode = CONTROL_MODE_WEB;
+
+  // TODO Сделать подгрузку сетевых настроек из памяти
+  bState.ip[0] = 192;
+  bState.ip[1] = 168;
+  bState.ip[2] = 100;
+  bState.ip[3] = 10;
+  bState.netmask[0] = 255;
+  bState.netmask[1] = 255;
+  bState.netmask[2] = 255;
+  bState.netmask[3] = 0;
+  bState.gateway[0] = 192;
+  bState.gateway[1] = 168;
+  bState.gateway[2] = 100;
+  bState.gateway[3] = 1;
+
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -210,7 +258,7 @@ int main(void)
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   cliTaskHandle = osThreadNew(vCommandConsoleTask, &huart7, &cliTask_attributes);
-  //motorTaskHandle = osThreadNew(MotorTask, NULL, &motorTask_attributes);
+  motorTaskHandle = osThreadNew(MotorTask, NULL, &motorTask_attributes);
   //pwmTaskHandle = osThreadNew( PWM_Task, NULL, &pwmTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
@@ -258,7 +306,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLM = 8;
   RCC_OscInitStruct.PLL.PLLN = 216;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 2;
+  RCC_OscInitStruct.PLL.PLLQ = 9;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -318,6 +366,32 @@ static void MX_QUADSPI_Init(void)
   /* USER CODE BEGIN QUADSPI_Init 2 */
 
   /* USER CODE END QUADSPI_Init 2 */
+
+}
+
+/**
+  * @brief RNG Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_RNG_Init(void)
+{
+
+  /* USER CODE BEGIN RNG_Init 0 */
+
+  /* USER CODE END RNG_Init 0 */
+
+  /* USER CODE BEGIN RNG_Init 1 */
+
+  /* USER CODE END RNG_Init 1 */
+  hrng.Instance = RNG;
+  if (HAL_RNG_Init(&hrng) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RNG_Init 2 */
+
+  /* USER CODE END RNG_Init 2 */
 
 }
 
@@ -578,7 +652,7 @@ void StartDefaultTask(void *argument)
 
   //Стартуем веб
   httpd_init();
-
+  Router_Init();
   startDhcpCheckTask();
 
   /* Infinite loop */
