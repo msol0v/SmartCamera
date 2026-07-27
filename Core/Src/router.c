@@ -29,7 +29,29 @@ static void http_write_json(struct fs_file *file, const char *json){
         json);
 
     file->data = response;
+    file->index = 0;
     file->flags = FS_FILE_FLAGS_HEADER_INCLUDED;
+    file->is_custom_file = 1;
+}
+
+//  У товарищей из ST ошибка, если не выставить LWIP_HTTPD_DYNAMIC_FILE_READ, то будет assert подниматься
+// на работу вроде не влияет но бесит
+int fs_read_custom(struct fs_file *file, char *buffer, int count)
+{
+    int bytes_left = file->len - file->index;
+
+    if (bytes_left <= 0) {
+        return FS_READ_EOF;
+    }
+
+    if (count > bytes_left) {
+        count = bytes_left;
+    }
+
+    memcpy(buffer, file->data + file->index, count);
+    file->index += count;
+
+    return count;
 }
 
 
@@ -38,13 +60,15 @@ static void http_write_json(struct fs_file *file, const char *json){
  */
 int fs_open_custom(struct fs_file *file, const char *name)
 {
+
     char json[128];
 
-    printf(name);
 
-    if(strcmp(name, "/api/status") == 0)
+    printf("%s\r\n", name);
+
+    if(strcmp(name, "/api/state") == 0)
     {
-        API_GET_Status(json);
+        API_GET_State(json);
         http_write_json(file, json);
         return 1;
     }

@@ -40,26 +40,37 @@ extern "C" {
   typedef enum
   {
     CONTROL_MODE_MVS,
-    CONTROL_MODE_PLC
+    CONTROL_MODE_PLC,
+    CONTROL_MODE_WEB
 } ControlMode_t;
-
-  typedef enum
-  {
-    PWM_SOURCE_MVS,
-    PWM_SOURCE_PLC
-} PWM_Source_t;
-
-  typedef struct
-  {
-    PWM_Source_t source;
-    uint16_t width;
-  } PWM_Message_t;
 
   typedef struct
   {
     uint8_t motor;
     int8_t step;
   } MotorCommand_t;
+
+  typedef enum {
+    TEST_MOTOR_1 = 0,
+    TEST_MOTOR_2 = 1,
+    TEST_MOTOR_3 = 2,
+    TEST_MOTOR_ALL = 7
+  }TestMotorsMask_t;
+
+  /* Структура состояния платки */
+  typedef struct {
+    uint32_t sessionID;
+    ControlMode_t controlMode;
+    uint8_t isActiveAutoTest;
+    TestMotorsMask_t testMotorsMask;
+    uint8_t testCyclesLeft;
+    uint8_t currentPreset;
+    uint32_t totalStepsMotors[3];
+    uint32_t avgStepsMotors[3];
+    uint8_t isMotorsCalibrated;
+    uint8_t stateGercons[6];
+    uint32_t presetPositions[3][3];
+  }State_t;
 
   extern volatile ControlMode_t controlMode;
 

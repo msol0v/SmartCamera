@@ -12,7 +12,6 @@
 
 
 void PWM_Task(void *argument);
-void changePWMsrc(PWM_Source_t source);
 
 extern osThreadId_t pwmTaskHandle;
 extern const osThreadAttr_t pwmTask_attributes;

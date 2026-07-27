@@ -276,6 +276,44 @@
     let isTestActive = false;
     let lastActionTime = 0;
 
+    // Активный мотор хранится локально в JS (0 = Диафрагма, 1 = Резкость, 2 = Фокус)
+    let activeMotor = 0;
+
+    // Переключение мотора локально
+    function selectMotorLocal(mId) {
+        activeMotor = mId;
+        for (let i = 0; i < 3; i++) {
+            let mBtn = document.getElementById('mt' + i);
+            if (mBtn) {
+                if (i === activeMotor) {
+                    mBtn.classList.add('active-motor');
+                } else {
+                    mBtn.classList.remove('active-motor');
+                }
+            }
+        }
+    }
+
+    // Отправка движения: монтируем motor и steps в один JSON-объект
+    // POST /api/motor/move -> { "motor": 0, "steps": -16 }
+    function moveMotor(stepsCount) {
+        lastActionTime = Date.now();
+        fetch('/api/motor/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                motor: activeMotor,
+                steps: stepsCount
+            })
+        })
+            .then(r => {
+                if (!r.ok) throw new Error('Network error');
+                return r.json();
+            })
+            .then(update)
+            .catch(e => console.log("Ожидание ответа контроллера..."));
+    }
+
     // Универсальная функция отправки REST-команд по POST
     function sendCommand(data) {
         lastActionTime = Date.now();
@@ -374,8 +412,8 @@
             }
         }
 
-        document.querySelectorAll('.active-mode, .active-motor, .active-step').forEach(b => {
-            b.classList.remove('active-mode', 'active-motor', 'active-step');
+        document.querySelectorAll('.active-mode, .active-step').forEach(b => {
+            b.classList.remove('active-mode', 'active-step');
         });
 
         let modeBtn = document.getElementById('md' + d.mode);
@@ -391,13 +429,11 @@
             }
             if (runBtn) { runBtn.innerText = 'ЦИКЛЫ: ' + d.rem; runBtn.style.background = '#444'; }
         } else {
-            if (d.mode === 2 && d.motor >= 0) {
-                let mBtn = document.getElementById('mt' + d.motor);
-                if (mBtn) mBtn.classList.add('active-motor');
-            }
+            // Подсветка локально выбранного мотора
+            selectMotorLocal(activeMotor);
 
             let isWebMode = (d.mode === 2);
-            let isMotorReady = (d.motor >= 0 && d.cal && d.cal[d.motor] === 1);
+            let isMotorReady = (d.cal && d.cal[activeMotor] === 1);
             let stepButtons = document.querySelectorAll('.cmd-pos, .cmd-neg');
 
             if (!isWebMode || !isMotorReady) {

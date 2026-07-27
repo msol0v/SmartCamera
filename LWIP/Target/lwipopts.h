@@ -93,6 +93,8 @@
 #define RECV_BUFSIZE_DEFAULT 2000000000
 /*----- Default Value for LWIP_HTTPD: 0 ---*/
 #define LWIP_HTTPD 1
+/*----- Default Value for LWIP_HTTPD_SSI: 0 ---*/
+#define LWIP_HTTPD_SSI 1
 /*----- Default Value for LWIP_HTTPD_SUPPORT_POST: 0 ---*/
 #define LWIP_HTTPD_SUPPORT_POST 1
 /*----- Default Value for HTTPD_SERVER_AGENT: "lwIP/2.0.0 (http://savannah.nongnu.org/projects/lwip)" ---*/
@@ -101,6 +103,8 @@
 #define LWIP_HTTPD_DYNAMIC_HEADERS 1
 /*----- Default Value for LWIP_HTTPD_CUSTOM_FILES: 0 ---*/
 #define LWIP_HTTPD_CUSTOM_FILES 1
+/*----- Default Value for LWIP_HTTPD_DYNAMIC_FILE_READ: 0 ---*/
+#define LWIP_HTTPD_DYNAMIC_FILE_READ 1
 /*----- Value in opt.h for LWIP_STATS: 1 -----*/
 #define LWIP_STATS 0
 /*----- Value in opt.h for CHECKSUM_GEN_IP: 1 -----*/

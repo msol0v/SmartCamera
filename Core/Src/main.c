@@ -200,7 +200,7 @@ int main(void)
   // Очередь команд управления моторами
   motorQueueHandle = osMessageQueueNew(4,sizeof(MotorCommand_t), NULL);
   // Очередь сообщений шим
-  pwmQueueHandle = osMessageQueueNew(8, sizeof(PWM_Message_t), NULL);
+  //pwmQueueHandle = osMessageQueueNew(8, sizeof(PWM_Message_t), NULL);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */

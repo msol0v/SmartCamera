@@ -7,7 +7,7 @@
 
 #include "router.h"
 
-void API_GET_Status(char *respJSON);
+void API_GET_State(char *respJSON);
 
 void API_GET_Mode(char *respJSON);
 
