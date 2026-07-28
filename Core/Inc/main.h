@@ -91,6 +91,16 @@ typedef struct {
   extern osMessageQueueId_t pwmQueueHandle;
   extern osMessageQueueId_t motorQueueHandle;
 
+
+  typedef struct {
+    uint8_t target_motors_mask; // Битовая маска моторов (bit 0: Диафрагма, bit 1: Резкость, bit 2: Фокус)
+    uint16_t total_cycles;      // количество циклов
+  } TestTaskArgs_t;
+  void AutoTestTask(void *argument);
+  extern osThreadId_t autoTestTaskHandle;
+  extern const osThreadAttr_t autoTestTask_attributes;
+uint8_t StartAutoTest(uint8_t motors_mask, uint16_t cycles);
+void StopAutoTest(void);
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/

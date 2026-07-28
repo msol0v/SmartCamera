@@ -43,7 +43,10 @@ add_executable(${CMAKE_PROJECT_NAME}
         Core/Src/router.c
         Core/Inc/api.h
         Core/Src/api.c
-        Core/Src/cmd.c)
+        Core/Src/cmd.c
+        Core/Inc/stepper.h
+        Core/Src/stepper.c
+        Core/Src/autotest_task.c)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)

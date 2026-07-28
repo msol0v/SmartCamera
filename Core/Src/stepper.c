@@ -22,13 +22,14 @@ Stepper_t stepper_init(int number_of_steps,  MotorPin_t *motor_pins) {
     return stepper;
 }
 
-/*
- * Устанавливает скорость в оборотах в минуту
- *
- * !!! В отличие от оригинальной библиотеки, где время считается в мкс, тут используется мс
- */
 void stepper_setSpeed(Stepper_t *motor, long whatSpeed) {
-    motor->step_delay = 60L * 1000L / motor->number_of_steps / whatSpeed;
+    // Задержка между шагами в миллисекундах
+    motor->step_delay = (60L * 1000L) / (motor->number_of_steps * whatSpeed);
+
+    // Страховка: задержка не может быть меньше 1 тика RTOS (1 мс)
+    if (motor->step_delay == 0) {
+        motor->step_delay = 1;
+    }
 }
 
 static void stepMotor(Stepper_t *motor, int thisStep) {
@@ -61,32 +62,39 @@ static void stepMotor(Stepper_t *motor, int thisStep) {
 }
 
 void stepper_step(Stepper_t *motor, int steps_to_move) {
-    int steps_left = abs(steps_to_move);    // Общее количество шагов без направления
-    if (steps_to_move > 0) { motor->direction = 1; }    // Направление
-    if (steps_to_move < 0) { motor->direction = 0; }
+    int steps_left = abs(steps_to_move);
 
-    // Пока все шаги не сделаем
+    // Определяем направление
+    if (steps_to_move > 0) {
+        motor->direction = 1;
+    } else if (steps_to_move < 0) {
+        motor->direction = 0;
+    } else {
+        return; // Если шагов 0, ничего не делаем
+    }
+
     while (steps_left > 0) {
-        // 1 тик = 1 мс
-        uint32_t now = osKernelGetTickCount();
-
-        if (now - motor->last_step_time >= motor->step_delay) {
-            motor->last_step_time = now;
-
-            if (motor->direction == 1) {
-                motor->step_number++;
-                if (motor->step_number == motor->number_of_steps)
-                    motor->step_number = 0;
+        // 1. Изменяем фазу (от 0 до 3) в зависимости от направления
+        if (motor->direction == 1) {
+            motor->step_number++;
+            if (motor->step_number >= 4) {
+                motor->step_number = 0;
             }
-            else {
-                if (motor->step_number ==0)
-                    motor->step_number = motor->number_of_steps;
-                motor->step_number--;
+        } else {
+            if (motor->step_number <= 0) {
+                motor->step_number = 4;
             }
-            steps_left--;
-
-            stepMotor(motor, motor->step_number % 4);
+            motor->step_number--;
         }
+
+        steps_left--;
+
+        // 2. Подаем физический импульс на обмотки
+        stepMotor(motor, motor->step_number);
+
+        // 3. Отдаем управление RTOS на время пауз между шагами!
+        // Это разгружает процессор и обеспечивает точный интервал шага.
+        osDelay(motor->step_delay);
     }
 }
 

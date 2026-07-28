@@ -231,25 +231,39 @@ void API_Cmd_Step(uint8_t stepCmd) {
 }
 
 void API_Cmd_Stop(void) {
-    bState.isActiveAutoTest = 0;
+// 1. Убиваем задачу автотеста, сбрасываем её флаги и очищаем очередь
+    StopAutoTest();
+
+    // 2. Сбрасываем текущий пресет
     bState.currentPreset = -1;
-    // Аварийная остановка движения, роняем очередь команд
-    osMessageQueueReset(motorQueueHandle);
-    // Если надо ронять выполнение текущей команды, то надо переделать немного логику выполнения таски моторов для проверки EventFlags
+
+    // 3. Дополнительно гарантируем очистку очереди команд моторов (если команды отправлялись не из автотеста)
+    if (motorQueueHandle != NULL) {
+        osMessageQueueReset(motorQueueHandle);
+    }
+
+    // 4. Обесточиваем/останавливаем моторы на аппаратном уровне
+    //DisableAllMotorDrivers();
+
+    printf("API Stop executed\r\n");
 }
 
 // TODO Написать задачу теста
 void API_Cmd_RunTest(uint8_t mask, uint8_t cycles) {
-    bState.testMotorsMask = mask;
-    bState.testCyclesLeft = cycles;
-    bState.isActiveAutoTest = 1;
     printf("run test, mask: %d, cycles: %d\r\n", mask, cycles);
-    memset(bState.isMotorsCalibrated, 1, sizeof(bState.isMotorsCalibrated));
+
+    // Пытаемся запустить задачу автотеста
+    if (!StartAutoTest(mask, (uint16_t)cycles)) {
+        printf("Error: Auto test is already running or out of memory!\r\n");
+    }
 }
 
 void API_Cmd_ResetStats(void) {
-    memset(bState.totalStepsMotors, 0, sizeof(bState.totalStepsMotors));
-    memset(bState.avgStepsMotors, 0, sizeof(bState.avgStepsMotors));
+    // Если запущен автотест, сбрасывать статистику "на лету" обычно не рекомендуется,
+    // но если это необходимо — сбрасываем поля
+    memset((void*)bState.totalStepsMotors, 0, sizeof(bState.totalStepsMotors));
+    memset((void*)bState.avgStepsMotors, 0, sizeof(bState.avgStepsMotors));
+
     printf("resetstats\r\n");
 }
 

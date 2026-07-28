@@ -33,7 +33,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+#include "stepper.h"
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -690,12 +690,11 @@ void StartDefaultTask(void *argument)
   /* init code for LWIP */
   MX_LWIP_Init();
   /* USER CODE BEGIN 5 */
-
   //Стартуем веб
   httpd_init();
   Router_Init();
   startDhcpCheckTask();
-
+  uint8_t dir = 0;
   /* Infinite loop */
   for(;;)
   {
@@ -704,9 +703,10 @@ void StartDefaultTask(void *argument)
      *
      */
     static const uint16_t reedPins[6] = {
-      REED_SW1_Pin, REED_SW2_Pin, REED_SW3_Pin,
-      REED_SW4_Pin, REED_SW5_Pin, REED_SW6_Pin
-    };
+      REED_SW5_Pin, REED_SW3_Pin, // [0] = Левый Диафрагмы, [1] = Правый Диафрагмы  <-- ИСПРАВЛЕНО
+      REED_SW1_Pin, REED_SW2_Pin, // [2] = Левый Резкости,  [3] = Правый Резкости   <-- ИСПРАВЛЕНО
+      REED_SW4_Pin, REED_SW6_Pin  // [4] = Левый Фокуса,    [5] = Правый Фокуса
+  };
 
     uint16_t portVal = REED_SW_Port->IDR;
     for (int i = 0; i < 6; i++) {

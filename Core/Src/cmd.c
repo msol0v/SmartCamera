@@ -23,6 +23,59 @@ static BaseType_t prvResetMCUCallback(char *pcWriteBuffer, size_t xWriteBufferLe
     while(1);
 }
 
+static BaseType_t prvStepCallback(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
+{
+    BaseType_t xParamLen1, xParamLen2;;
+    const char *pcParam1, *pcParam2;
+
+    pcParam1 = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen1);
+    pcParam2 = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen2);
+
+    if (pcParam1 == NULL || pcParam2 == NULL)
+    {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Ошибка: требуется 2 аргумента: <мотор (0-2)> <шаг (-16..16)>\r\n");
+        return pdFALSE;
+    }
+
+    char *endptr1, *endptr2;
+    long val1 = strtol(pcParam1, &endptr1, 10);
+    long val2 = strtol(pcParam2, &endptr2, 10);
+
+    // Проверка: были ли параметры действительными числами
+    if ((endptr1 == pcParam1) || (endptr2 == pcParam2))
+    {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Ошибка: аргументы должны быть целыми числами!\r\n");
+        return pdFALSE;
+    }
+
+    // 4. Проверяем диапазоны
+    // Первый аргумент: от 0 до 2
+    if (val1 < 0 || val1 > 2)
+    {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Ошибка: 1-й аргумент (мотор) должен быть от 0 до 2 (передано: %ld)\r\n", val1);
+        return pdFALSE;
+    }
+
+    // // Второй аргумент: от -16 до +16
+    // if (val2 < -16 || val2 > 16)
+    // {
+    //     snprintf(pcWriteBuffer, xWriteBufferLen, "Ошибка: 2-й аргумент (шаг) должен быть от -16 до +16 (передано: %ld)\r\n", val2);
+    //     return pdFALSE;
+    // }
+
+    // 5. Выполняем полезное действие (здесь логика вашей программы)
+    uint8_t motor = (uint8_t)val1;
+    int8_t steps = (int8_t)val2;
+    MotorCommand_t msg = {
+        .motor = motor,
+        .step = steps
+    };
+
+    osMessageQueuePut(motorQueueHandle, &msg, 0, 0);
+
+    return pdFALSE;
+}
+
 static BaseType_t prvModeMCUCallback(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString) {
     BaseType_t xParamLen;
     const char *pcParam = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
@@ -73,19 +126,19 @@ static void prvEnableDHCP(void)
 {
     if (netif_default != NULL)
     {
-        // Останавливаем старую работу и освобождаем адрес
-        dhcp_release(netif_default);
-        dhcp_stop(netif_default);
-
-        //Сброс IP чтобы таска проверки знала, что мы ждем новый адрес
-        ip_addr_t zero_ip = IPADDR4_INIT(0);
-        netif_set_ipaddr(netif_default, ip_2_ip4(&zero_ip));
-
-        //Запускаем DHCP
-        dhcp_start(netif_default);
-
-        //Будим поток отслеживания
-        startDhcpCheckTask();
+        // // Останавливаем старую работу и освобождаем адрес
+        // dhcp_release(netif_default);
+        // dhcp_stop(netif_default);
+        //
+        // //Сброс IP чтобы таска проверки знала, что мы ждем новый адрес
+        // ip_addr_t zero_ip = IPADDR4_INIT(0);
+        // netif_set_ipaddr(netif_default, ip_2_ip4(&zero_ip));
+        //
+        // //Запускаем DHCP
+        // dhcp_start(netif_default);
+        //
+        // //Будим поток отслеживания
+        // startDhcpCheckTask();
     }
 }
 
@@ -98,7 +151,7 @@ static void prvSetStaticIP(const char *pcIP, const char *pcMask, const char *pcG
         ip4addr_aton(pcMask, &netmask) &&
         ip4addr_aton(pcGW, &gw))
     {
-        dhcp_stop(netif_default);
+        // dhcp_stop(netif_default);
         netif_set_addr(netif_default, &ipaddr, &netmask, &gw);
     }
 }
@@ -129,12 +182,12 @@ static BaseType_t prvIpCommandCallback(char *pcWriteBuffer, size_t xWriteBufferL
             ip4addr_ntoa_r(netif_ip4_netmask(netif_default), cMask, sizeof(cMask));
             ip4addr_ntoa_r(netif_ip4_gw(netif_default), cGW, sizeof(cGW));
 
-            snprintf(pcWriteBuffer, xWriteBufferLen,
-                     "Current IP: %s\r\nMask: %s\r\nGW: %s\r\nMode: %s\r\n",
-                     cIP,
-                     cMask,
-                     cGW,
-                     dhcp_supplied_address(netif_default) ? "DHCP" : "Static");
+            // snprintf(pcWriteBuffer, xWriteBufferLen,
+            //          "Current IP: %s\r\nMask: %s\r\nGW: %s\r\nMode: %s\r\n",
+            //          cIP,
+            //          cMask,
+            //          cGW,
+            //          dhcp_supplied_address(netif_default) ? "DHCP" : "Static");
         }
         else
         {
@@ -175,14 +228,14 @@ static BaseType_t prvIpCommandCallback(char *pcWriteBuffer, size_t xWriteBufferL
                 netif_set_up(netif_default);
 
                 // Если включен DHCP перезапускаем его
-                if (dhcp_supplied_address(netif_default))
-                {
-                    prvEnableDHCP();
-                }
-                else
-                {
+                // if (dhcp_supplied_address(netif_default))
+                // {
+                //     prvEnableDHCP();
+                // }
+                // else
+                // {
                     netif_set_link_up(netif_default);
-                }
+                //}
             }
             snprintf(pcWriteBuffer, xWriteBufferLen, "PHY Reset Complete. Link restoring...\r\n");
         }
@@ -246,8 +299,18 @@ static const CLI_Command_Definition_t xModeCommandDefinition = {
     .pcHelpString                = "mode:\r\n"
                                    "    Select board control mode\r\n"
                                    "    Usage:\r\n"
-                                   "        mode <MVS|PLC|WEB>",
+                                   "        mode <MVS|PLC|WEB>\r\n",
     .pxCommandInterpreter        = prvModeMCUCallback,
+    .cExpectedNumberOfParameters = -1
+};
+
+static const CLI_Command_Definition_t xStepCommandDefinition = {
+    .pcCommand                   = "step",
+    .pcHelpString                = "step:\r\n"
+                                   "    Do step motor\r\n"
+                                   "    Usage:\r\n"
+                                   "        step <motor> <steps>",
+    .pxCommandInterpreter        = prvStepCallback,
     .cExpectedNumberOfParameters = -1
 };
 
@@ -257,4 +320,5 @@ void vRegisterCommands(void)
     FreeRTOS_CLIRegisterCommand(&xIpCommandDefinition);
     FreeRTOS_CLIRegisterCommand(&xResetCommandDefinition);
     FreeRTOS_CLIRegisterCommand(&xModeCommandDefinition);
+    FreeRTOS_CLIRegisterCommand(&xStepCommandDefinition);
 }
