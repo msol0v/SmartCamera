@@ -24,6 +24,6 @@ extern const osThreadAttr_t cliTask_attributes;
 
 void vCommandConsoleTask( void *pvParameters );
 
-extern void vRegisterIPCommand(void);
+extern void vRegisterCommands(void);
 
 #endif //SMARTCAMERA_CLI_H

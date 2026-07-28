@@ -1,7 +1,6 @@
 //
-// Created by msol0v on 23.07.2026.
+// Created by msol0v on 28.07.2026.
 //
-
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -16,6 +15,59 @@
 #include "lwip/dhcp.h"
 
 #include "main.h"
+#include "pwm_task.h"
+
+static BaseType_t prvResetMCUCallback(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString) {
+    __disable_irq();
+    NVIC_SystemReset();
+    while(1);
+}
+
+static BaseType_t prvModeMCUCallback(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString) {
+    BaseType_t xParamLen;
+    const char *pcParam = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+    if (pcParam == NULL) {
+        const char *modeStr = "UNKNOWN";
+
+        switch (bState.controlMode) {
+            case CONTROL_MODE_MVS: modeStr = "MVS"; break;
+            case CONTROL_MODE_PLC: modeStr = "PLC"; break;
+            case CONTROL_MODE_WEB: modeStr = "WEB"; break;
+            default: break;
+        }
+
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Current mode: %s\r\n", modeStr);
+        return pdFALSE;
+    }
+
+    // Сравниваем полученную строку с ожидаемыми значениями
+    if (strncmp(pcParam, "MVS", xParamLen) == 0 && xParamLen == 3)
+    {
+        stopCurrentModeRead();
+        bState.controlMode = CONTROL_MODE_MVS;
+        startCurrendModeRead();
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Mode changed to MVS\r\n");
+    }
+    else if (strncmp(pcParam, "PLC", xParamLen) == 0 && xParamLen == 3)
+    {
+        stopCurrentModeRead();
+        bState.controlMode = CONTROL_MODE_PLC;
+        startCurrendModeRead();
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Mode changed to PLC\r\n");
+    }
+    else if (strncmp(pcParam, "WEB", xParamLen) == 0 && xParamLen == 3)
+    {
+        stopCurrentModeRead();
+        bState.controlMode = CONTROL_MODE_WEB;
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Mode changed to WEB\r\n");
+    }
+    else
+    {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Error: Unknown mode. Use MVS, PLC or WEB.\r\n");
+    }
+    return pdFALSE;
+}
+
 
 static void prvEnableDHCP(void)
 {
@@ -29,7 +81,7 @@ static void prvEnableDHCP(void)
         ip_addr_t zero_ip = IPADDR4_INIT(0);
         netif_set_ipaddr(netif_default, ip_2_ip4(&zero_ip));
 
-        //Запускаем DHCP заново
+        //Запускаем DHCP
         dhcp_start(netif_default);
 
         //Будим поток отслеживания
@@ -165,6 +217,16 @@ static BaseType_t prvIpCommandCallback(char *pcWriteBuffer, size_t xWriteBufferL
     return pdFALSE;
 }
 
+/* ##############       Дефинишены команд       ##########################*/
+
+static const CLI_Command_Definition_t xResetCommandDefinition = {
+    .pcCommand                   = "reset",
+    .pcHelpString                = "reset:\r\n"
+                                   "    Software MCU Reset.\r\n",
+    .pxCommandInterpreter        = prvResetMCUCallback,
+    .cExpectedNumberOfParameters = 0 // Принимает от 0 до 3 параметров
+};
+
 //Описание структуры команды
 static const CLI_Command_Definition_t xIpCommandDefinition = {
     .pcCommand                   = "ip",
@@ -179,8 +241,20 @@ static const CLI_Command_Definition_t xIpCommandDefinition = {
     .cExpectedNumberOfParameters = -1 // Принимает от 0 до 3 параметров
 };
 
+static const CLI_Command_Definition_t xModeCommandDefinition = {
+    .pcCommand                   = "mode",
+    .pcHelpString                = "mode:\r\n"
+                                   "    Select board control mode\r\n"
+                                   "    Usage:\r\n"
+                                   "        mode <MVS|PLC|WEB>",
+    .pxCommandInterpreter        = prvModeMCUCallback,
+    .cExpectedNumberOfParameters = -1
+};
+
 // Публичная функция регистрации
-void vRegisterIPCommand(void)
+void vRegisterCommands(void)
 {
     FreeRTOS_CLIRegisterCommand(&xIpCommandDefinition);
+    FreeRTOS_CLIRegisterCommand(&xResetCommandDefinition);
+    FreeRTOS_CLIRegisterCommand(&xModeCommandDefinition);
 }

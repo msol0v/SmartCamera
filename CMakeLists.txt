@@ -35,7 +35,6 @@ enable_language(C ASM)
 add_executable(${CMAKE_PROJECT_NAME}
         Core/Src/FreeRTOS_CLI.c
         Core/Src/cli.c
-        Core/Src/cmd_ip.c
         Core/Inc/motor_task.h
         Core/Src/motor_task.c
         Core/Src/pwm_task.c
@@ -43,7 +42,8 @@ add_executable(${CMAKE_PROJECT_NAME}
         Core/Inc/router.h
         Core/Src/router.c
         Core/Inc/api.h
-        Core/Src/api.c)
+        Core/Src/api.c
+        Core/Src/cmd.c)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)

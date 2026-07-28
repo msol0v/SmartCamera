@@ -51,7 +51,7 @@ void vCommandConsoleTask(void *pvParameters)
     static char pcOutputString[MAX_OUTPUT_LENGTH];
     static char pcInputString[MAX_INPUT_LENGTH];
 
-    vRegisterIPCommand();
+    vRegisterCommands();
 
     // Инициализируем прием UART и очередь
     Console_Init();

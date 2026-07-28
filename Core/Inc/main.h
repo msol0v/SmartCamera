@@ -38,14 +38,14 @@ extern "C" {
 /* USER CODE BEGIN ET */
 
 // Выставляется чтобы пользоваться dhcp. В кубах почему-то нельзя задать статик и включить dhcp модуль одновременно
-#define LWIP_DHCP 1
+//#define LWIP_DHCP 1
 
   typedef enum
   {
     CONTROL_MODE_MVS,
     CONTROL_MODE_PLC,
     CONTROL_MODE_WEB
-} ControlMode_t;
+  } ControlMode_t;
 
   typedef struct
   {
@@ -108,6 +108,7 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
   void startDhcpCheckTask(void);
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -143,7 +144,7 @@ void Error_Handler(void);
 #define EN_DRIV3_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
-
+#define REED_SW_Port GPIOD
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

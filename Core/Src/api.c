@@ -4,6 +4,8 @@
 
 #include "api.h"
 
+#include "pwm_task.h"
+
 
 // Вспомогательная функция декодирования URL-символов (%XX и +)
 static void url_decode(const char *src, char *dst, size_t maxLen) {
@@ -189,9 +191,10 @@ void API_ProcessCommand(const char *urlStr)
     }
 }
 
-// Заглушки логических обработчиков (реализуются под вашу периферию / FreeRTOS очереди)
 void API_Cmd_SetMode(uint8_t mode) {
+    stopCurrentModeRead();
     bState.controlMode = mode;
+    startCurrendModeRead();
 }
 
 // Работает только в вебе? Я бы убрал, есть смысл передавать сразу номер моторчика и шаги не отдельными командами, а числом шагов со знаком

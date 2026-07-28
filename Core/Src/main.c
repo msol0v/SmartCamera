@@ -26,6 +26,9 @@
 #include "cli.h"
 #include "httpd.h"
 #include "motor_task.h"
+#include "pwm_task.h"
+#include "tcp.h"
+#include "tcp_priv.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -207,9 +210,9 @@ int main(void)
   memset(&bState, 0, sizeof(bState));
 
   // Аппаратный рандом
-  HAL_RNG_GenerateRandomNumber(&hrng, &bState.sessionID);
+  HAL_RNG_GenerateRandomNumber(&hrng, (uint32_t *)&bState.sessionID);
   // Стартуем с веба
-  bState.controlMode = CONTROL_MODE_WEB;
+  bState.controlMode = CONTROL_MODE_MVS;
 
   // TODO Сделать подгрузку сетевых настроек из памяти
   bState.ip[0] = 192;
@@ -224,6 +227,9 @@ int main(void)
   bState.gateway[1] = 168;
   bState.gateway[2] = 100;
   bState.gateway[3] = 1;
+
+  //printf("WAIT 10 sec\r\n");
+  //HAL_Delay(10000);
 
   /* USER CODE END 2 */
 
@@ -248,7 +254,7 @@ int main(void)
   // Очередь команд управления моторами
   motorQueueHandle = osMessageQueueNew(4,sizeof(MotorCommand_t), NULL);
   // Очередь сообщений шим
-  //pwmQueueHandle = osMessageQueueNew(8, sizeof(PWM_Message_t), NULL);
+  pwmQueueHandle = osMessageQueueNew(8, sizeof(PWM_Message_t), NULL);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -259,11 +265,12 @@ int main(void)
   /* add threads, ... */
   cliTaskHandle = osThreadNew(vCommandConsoleTask, &huart7, &cliTask_attributes);
   motorTaskHandle = osThreadNew(MotorTask, NULL, &motorTask_attributes);
-  //pwmTaskHandle = osThreadNew( PWM_Task, NULL, &pwmTask_attributes);
+  pwmTaskHandle = osThreadNew( PWM_Task, NULL, &pwmTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
+
   /* USER CODE END RTOS_EVENTS */
 
   /* Start scheduler */
@@ -415,7 +422,7 @@ static void MX_TIM8_Init(void)
 
   /* USER CODE END TIM8_Init 1 */
   htim8.Instance = TIM8;
-  htim8.Init.Prescaler = 216;
+  htim8.Init.Prescaler = 215;
   htim8.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim8.Init.Period = 65535;
   htim8.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -569,6 +576,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
   /* USER CODE BEGIN MX_GPIO_Init_1 */
 
+  /*
+   * На ножки с герконами обязательно нужно включить подтяжку к земле.
+   * Без нее будет вилять сигнал
+   */
+
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
@@ -589,8 +601,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, IN3_DRIV_Pin|IN2_DRIV_Pin|IN4_DRIV_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, IN1_DRIV_Pin|EN_DRIV1_Pin|REED_SW1_Pin|REED_SW2_Pin
-                          |REED_SW3_Pin|REED_SW4_Pin|REED_SW5_Pin|REED_SW6_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, IN1_DRIV_Pin|EN_DRIV1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : RESET_PHY_Pin */
   GPIO_InitStruct.Pin = RESET_PHY_Pin;
@@ -619,13 +630,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : IN1_DRIV_Pin EN_DRIV1_Pin REED_SW1_Pin REED_SW2_Pin
-                           REED_SW3_Pin REED_SW4_Pin REED_SW5_Pin REED_SW6_Pin */
-  GPIO_InitStruct.Pin = IN1_DRIV_Pin|EN_DRIV1_Pin|REED_SW1_Pin|REED_SW2_Pin
-                          |REED_SW3_Pin|REED_SW4_Pin|REED_SW5_Pin|REED_SW6_Pin;
+  /*Configure GPIO pins : IN1_DRIV_Pin EN_DRIV1_Pin */
+  GPIO_InitStruct.Pin = IN1_DRIV_Pin|EN_DRIV1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : REED_SW1_Pin REED_SW2_Pin REED_SW3_Pin REED_SW4_Pin
+                           REED_SW5_Pin REED_SW6_Pin */
+  GPIO_InitStruct.Pin = REED_SW1_Pin|REED_SW2_Pin|REED_SW3_Pin|REED_SW4_Pin
+                          |REED_SW5_Pin|REED_SW6_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
@@ -634,7 +651,31 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+#include "lwip/tcp.h"
+#include "lwip/priv/tcp_priv.h"
 
+// Внешний список активных TCP-соединений LwIP
+extern struct tcp_pcb *tcp_active_pcbs;
+
+uint16_t get_http_tcp_clients_count(void) {
+  uint16_t count = 0;
+
+  // Блокируем контекст LwIP для потокобезопасного чтения списка
+  SYS_ARCH_DECL_PROTECT(lev);
+  SYS_ARCH_PROTECT(lev);
+
+  struct tcp_pcb *pcb = tcp_active_pcbs;
+  while (pcb != NULL) {
+    // Фильтруем по порту (например, 80) и состоянию ESTABLISHED
+    if (pcb->local_port == 80 && pcb->state == ESTABLISHED) {
+      count++;
+    }
+    pcb = pcb->next;
+  }
+
+  SYS_ARCH_UNPROTECT(lev);
+  return count;
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -658,7 +699,22 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
+    /* Чтобы не делать отдельную задачу под задачу чтение герконов, будем читать в дефолте
+     * Читать будем сразу весь порт, чтобы не юзать хал для каждой
+     *
+     */
+    static const uint16_t reedPins[6] = {
+      REED_SW1_Pin, REED_SW2_Pin, REED_SW3_Pin,
+      REED_SW4_Pin, REED_SW5_Pin, REED_SW6_Pin
+    };
+
+    uint16_t portVal = REED_SW_Port->IDR;
+    for (int i = 0; i < 6; i++) {
+      bState.stateGercons[i] = (portVal & reedPins[i]) ? GPIO_PIN_SET : GPIO_PIN_RESET;
+    }
+
     osDelay(1);
+
   }
   /* USER CODE END 5 */
 }
