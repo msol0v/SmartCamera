@@ -5,7 +5,9 @@
 #include "api.h"
 
 #include "pwm_task.h"
-
+#include "app_storage.h"
+#include "lwip/ip_addr.h"  // Подключаем парсер LwIP
+#include "lwip/netif.h"
 
 // Вспомогательная функция декодирования URL-символов (%XX и +)
 static void url_decode(const char *src, char *dst, size_t maxLen) {
@@ -248,7 +250,6 @@ void API_Cmd_Stop(void) {
     printf("API Stop executed\r\n");
 }
 
-// TODO Написать задачу теста
 void API_Cmd_RunTest(uint8_t mask, uint8_t cycles) {
     printf("run test, mask: %d, cycles: %d\r\n", mask, cycles);
 
@@ -263,16 +264,27 @@ void API_Cmd_ResetStats(void) {
     // но если это необходимо — сбрасываем поля
     memset((void*)bState.totalStepsMotors, 0, sizeof(bState.totalStepsMotors));
     memset((void*)bState.avgStepsMotors, 0, sizeof(bState.avgStepsMotors));
-
-    printf("resetstats\r\n");
 }
 
 void API_Cmd_SavePreset(uint8_t presetIdx) {
-    if (presetIdx < 3) {
-        // Сохранить текущие позиции моторов
-        bState.currentPreset = -1;
+    // 1. Проверка корректности индекса слота (всего 3 пресета)
+    if (presetIdx >= 3) {
+        return;
     }
-    printf("savepresets id: %d\r\n", presetIdx);
+
+    // 2. Копируем текущие фактические позиции моторов в слот bState.
+    // Замените getCurrentMotorPosition(i) на вашу реальную переменную/функцию позиций моторов!
+    for (int motor = 0; motor < 3; motor++) {
+        bState.presetPositions[presetIdx][motor] = 99999;//getCurrentMotorPosition(motor);
+    }
+
+    // 3. Формируем или обновляем имя пресета, если оно было пустым
+    if (bState.presetNames[presetIdx][0] == '\0') {
+        snprintf((char*)bState.presetNames[presetIdx], 64, "Preset %d", presetIdx + 1);
+    }
+
+    // 4. Записываем обновлённую секцию пресетов во Flash через LittleFS
+    Storage_SavePresets();
 }
 
 void API_Cmd_GoPreset(uint8_t presetIdx) {
@@ -280,7 +292,6 @@ void API_Cmd_GoPreset(uint8_t presetIdx) {
         bState.currentPreset = presetIdx;
         // Запустить перемещение моторов в записанные координаты
     }
-    printf("go preset id: %d\r\n", presetIdx);
 }
 
 void API_Cmd_ClearPreset(uint8_t presetIdx) {
@@ -301,6 +312,26 @@ void API_Cmd_SetPresetName(uint8_t presetIdx, const char *encodedName) {
 }
 
 void API_Cmd_SaveNetSettings(const char *ipStr, const char *gwStr, const char *snStr) {
-    // Сохранить настройки в Flash/EEPROM и выполнить программную перезагрузку (NVIC_SystemReset)
-    printf("savenetsettings ip: %s, gw: %s, mask: %s\r\n", ipStr, gwStr, snStr);
+    if (ipStr == NULL || gwStr == NULL || snStr == NULL) return;
+
+    ip4_addr_t parsed_ip, parsed_gw, parsed_sn;
+
+    // ip4addr_aton возвращает 1 при успехе и 0 при ошибке формата строки
+    if (!ip4addr_aton(ipStr, &parsed_ip) ||
+        !ip4addr_aton(gwStr, &parsed_gw) ||
+        !ip4addr_aton(snStr, &parsed_sn)) {
+        // Ошибка: одна из строк имеет неверный формат IP-адреса
+        return;
+        }
+
+    // Копируем напрямую в bState.
+    memcpy((void*)bState.ip,      &parsed_ip.addr, 4);
+    memcpy((void*)bState.gateway, &parsed_gw.addr, 4);
+    memcpy((void*)bState.netmask, &parsed_sn.addr, 4);
+
+    // Фиксируем изменения во Flash
+    Storage_SaveNetwork();
+
+    // Сразу обновляем
+    netif_set_addr(netif_default, &parsed_ip, &parsed_sn, &parsed_gw);
 }

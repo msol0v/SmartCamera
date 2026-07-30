@@ -46,7 +46,18 @@ add_executable(${CMAKE_PROJECT_NAME}
         Core/Src/cmd.c
         Core/Inc/stepper.h
         Core/Src/stepper.c
-        Core/Src/autotest_task.c)
+        Core/Src/autotest_task.c
+        Core/Inc/w25q_mem.h
+        Core/Src/w25q_mem.c
+        Core/Inc/lfs_util.h
+        Core/Src/lfs_util.c
+        Core/Inc/lfs.h
+        Core/Src/lfs.c
+        Core/Inc/lfs_w25q_adapter.h
+        Core/Src/lfs_w25q_adapter.c
+        Core/Inc/app_storage.h
+        Core/Src/app_storage.c
+        Core/Inc/cert.h)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
@@ -69,6 +80,8 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
+        LFS_THREADSAFE
+        #LFS_YES_TRACE // Если надо отладить ФС
 )
 
 # Remove wrong libob.a library dependency when using cpp files

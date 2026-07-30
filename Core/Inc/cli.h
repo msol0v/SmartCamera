@@ -19,6 +19,8 @@
 #define MAX_INPUT_LENGTH    50
 #define MAX_OUTPUT_LENGTH   1000
 
+#define HISTORY_MAX_DEPTH   10  // Размер буфера истории команд
+
 extern osThreadId_t cliTaskHandle;
 extern const osThreadAttr_t cliTask_attributes;
 

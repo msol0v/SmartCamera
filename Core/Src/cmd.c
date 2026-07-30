@@ -16,6 +16,7 @@
 
 #include "main.h"
 #include "pwm_task.h"
+#include "app_storage.h"
 
 static BaseType_t prvResetMCUCallback(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString) {
     __disable_irq();
@@ -23,55 +24,136 @@ static BaseType_t prvResetMCUCallback(char *pcWriteBuffer, size_t xWriteBufferLe
     while(1);
 }
 
+static BaseType_t prvGerconsCallback(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString){
+    snprintf(pcWriteBuffer, xWriteBufferLen, "\r\n[ %d | %d | %d | %d | %d | %d ]\r\n",
+        bState.stateGercons[0], bState.stateGercons[1], bState.stateGercons[2],
+        bState.stateGercons[3], bState.stateGercons[4], bState.stateGercons[5]);
+    return pdFALSE;
+}
+
+static BaseType_t prvFileCallback(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString) {
+    //Проверяем, смонтирована ли ФС
+    if (!Storage_IsMounted()) {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Error: Storage is not mounted or failed to initialize!\r\n");
+        return pdFALSE;
+    }
+
+
+    BaseType_t xParamLen;
+    const char *pcParam = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+    size_t fileSize;
+
+    if (pcParam == NULL || xParamLen == 0) {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Usage: file <net.bin|presets.bin>\r\n");
+        return pdFALSE;
+    }
+
+    if (strncmp(pcParam, "net.bin", xParamLen) == 0){
+        NetFile_t netData;
+        if (Storage_ReadFile("net.bin", &netData, sizeof(NetFile_t))) {
+            // Файл успешно прочитан
+            snprintf(pcWriteBuffer, xWriteBufferLen,
+                     "\r\n"
+                     "IP: %d.%d.%d.%d\r\n"
+                     "Mask: %d.%d.%d.%d\r\n"
+                     "GW: %d.%d.%d.%d\r\n",
+                     netData.ip[0], netData.ip[1], netData.ip[2], netData.ip[3],
+                     netData.mask[0], netData.mask[1], netData.mask[2], netData.mask[3],
+                     netData.gw[0], netData.gw[1], netData.gw[2], netData.gw[3]);
+        }
+    }
+    else if (strncmp(pcParam, "presets.bin", xParamLen) == 0) {
+        PresetsFile_t presetsData;
+        if (Storage_ReadFile("presets.bin", &presetsData, sizeof(PresetsFile_t))) {
+            size_t written = snprintf(pcWriteBuffer, xWriteBufferLen, "\r\n");
+
+            for (int i = 0; i < PRESETS_NUM; i++) {
+                // Проверяем, осталось ли место в буфере вывода CLI
+                if (written >= xWriteBufferLen) break;
+
+                written += snprintf(pcWriteBuffer + written, xWriteBufferLen - written,
+                                    "[%d] %-10s: M1=%ld, M2=%ld, M3=%ld\r\n",
+                                    i + 1,
+                                    presetsData.names[i],
+                                    (long)presetsData.positions[i][0],
+                                    (long)presetsData.positions[i][1],
+                                    (long)presetsData.positions[i][2]);
+            }
+        } else {
+            snprintf(pcWriteBuffer, xWriteBufferLen, "Error: File 'presets.bin' not found or read failed!\r\n");
+        }
+    }
+    // Неизвестный файл
+    else {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Error: Unknown file '%.*s'\r\n", (int)xParamLen, pcParam);
+    }
+
+    return pdFALSE;
+}
+
 static BaseType_t prvStepCallback(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
-    BaseType_t xParamLen1, xParamLen2;;
+    BaseType_t xParamLen1 = 0, xParamLen2 = 0;
     const char *pcParam1, *pcParam2;
 
     pcParam1 = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen1);
     pcParam2 = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen2);
 
-    if (pcParam1 == NULL || pcParam2 == NULL)
+    // Проверка наличия аргументов
+    if (pcParam1 == NULL || pcParam2 == NULL || xParamLen1 == 0 || xParamLen2 == 0)
     {
-        snprintf(pcWriteBuffer, xWriteBufferLen, "Ошибка: требуется 2 аргумента: <мотор (0-2)> <шаг (-16..16)>\r\n");
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Error: 2 arguments required: <motor> <step>\r\n");
         return pdFALSE;
     }
+
+    // Буферы для создания честных C-строк с '\0' на конце
+    char szParam1[16] = {0};
+    char szParam2[16] = {0};
+
+    // Проверка, что аргументы помещаются в буфер
+    if (xParamLen1 >= sizeof(szParam1) || xParamLen2 >= sizeof(szParam2))
+    {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Error: Argument too long!\r\n");
+        return pdFALSE;
+    }
+
+    // Копируем ровно столько байт, сколько занимает аргумент
+    strncpy(szParam1, pcParam1, xParamLen1);
+    szParam1[xParamLen1] = '\0';
+
+    strncpy(szParam2, pcParam2, xParamLen2);
+    szParam2[xParamLen2] = '\0';
 
     char *endptr1, *endptr2;
-    long val1 = strtol(pcParam1, &endptr1, 10);
-    long val2 = strtol(pcParam2, &endptr2, 10);
+    long val1 = strtol(szParam1, &endptr1, 10);
+    long val2 = strtol(szParam2, &endptr2, 10);
 
-    // Проверка: были ли параметры действительными числами
-    if ((endptr1 == pcParam1) || (endptr2 == pcParam2))
+    // Проверка, были ли параметры действительными числами (*endptr != '\0' значит, что были лишние символы)
+    if ((endptr1 == szParam1) || (*endptr1 != '\0') || (endptr2 == szParam2) || (*endptr2 != '\0'))
     {
-        snprintf(pcWriteBuffer, xWriteBufferLen, "Ошибка: аргументы должны быть целыми числами!\r\n");
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Error: arguments must be integers!\r\n");
         return pdFALSE;
     }
 
-    // 4. Проверяем диапазоны
     // Первый аргумент: от 0 до 2
     if (val1 < 0 || val1 > 2)
     {
-        snprintf(pcWriteBuffer, xWriteBufferLen, "Ошибка: 1-й аргумент (мотор) должен быть от 0 до 2 (передано: %ld)\r\n", val1);
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Error: 1st argument (motor) must be between 0 and 2 (passed: %ld)\r\n", val1);
         return pdFALSE;
     }
 
-    // // Второй аргумент: от -16 до +16
-    // if (val2 < -16 || val2 > 16)
-    // {
-    //     snprintf(pcWriteBuffer, xWriteBufferLen, "Ошибка: 2-й аргумент (шаг) должен быть от -16 до +16 (передано: %ld)\r\n", val2);
-    //     return pdFALSE;
-    // }
-
-    // 5. Выполняем полезное действие (здесь логика вашей программы)
     uint8_t motor = (uint8_t)val1;
     int8_t steps = (int8_t)val2;
+
     MotorCommand_t msg = {
         .motor = motor,
         .step = steps
     };
 
     osMessageQueuePut(motorQueueHandle, &msg, 0, 0);
+
+    // Очищаем буфер ответа при успешном выполнении
+    pcWriteBuffer[0] = '\0';
 
     return pdFALSE;
 }
@@ -126,19 +208,19 @@ static void prvEnableDHCP(void)
 {
     if (netif_default != NULL)
     {
-        // // Останавливаем старую работу и освобождаем адрес
-        // dhcp_release(netif_default);
-        // dhcp_stop(netif_default);
-        //
-        // //Сброс IP чтобы таска проверки знала, что мы ждем новый адрес
-        // ip_addr_t zero_ip = IPADDR4_INIT(0);
-        // netif_set_ipaddr(netif_default, ip_2_ip4(&zero_ip));
-        //
-        // //Запускаем DHCP
-        // dhcp_start(netif_default);
-        //
-        // //Будим поток отслеживания
-        // startDhcpCheckTask();
+        // Останавливаем старую работу и освобождаем адрес
+        dhcp_release(netif_default);
+        dhcp_stop(netif_default);
+
+        //Сброс IP чтобы таска проверки знала, что мы ждем новый адрес
+        ip_addr_t zero_ip = IPADDR4_INIT(0);
+        netif_set_ipaddr(netif_default, ip_2_ip4(&zero_ip));
+
+        //Запускаем DHCP
+        dhcp_start(netif_default);
+
+        //Будим поток отслеживания
+        startDhcpCheckTask();
     }
 }
 
@@ -181,13 +263,6 @@ static BaseType_t prvIpCommandCallback(char *pcWriteBuffer, size_t xWriteBufferL
             ip4addr_ntoa_r(netif_ip4_addr(netif_default), cIP, sizeof(cIP));
             ip4addr_ntoa_r(netif_ip4_netmask(netif_default), cMask, sizeof(cMask));
             ip4addr_ntoa_r(netif_ip4_gw(netif_default), cGW, sizeof(cGW));
-
-            // snprintf(pcWriteBuffer, xWriteBufferLen,
-            //          "Current IP: %s\r\nMask: %s\r\nGW: %s\r\nMode: %s\r\n",
-            //          cIP,
-            //          cMask,
-            //          cGW,
-            //          dhcp_supplied_address(netif_default) ? "DHCP" : "Static");
         }
         else
         {
@@ -227,15 +302,15 @@ static BaseType_t prvIpCommandCallback(char *pcWriteBuffer, size_t xWriteBufferL
             {
                 netif_set_up(netif_default);
 
-                // Если включен DHCP перезапускаем его
-                // if (dhcp_supplied_address(netif_default))
-                // {
-                //     prvEnableDHCP();
-                // }
-                // else
-                // {
+                //Если включен DHCP перезапускаем его
+                if (dhcp_supplied_address(netif_default))
+                {
+                    prvEnableDHCP();
+                }
+                else
+                {
                     netif_set_link_up(netif_default);
-                //}
+                }
             }
             snprintf(pcWriteBuffer, xWriteBufferLen, "PHY Reset Complete. Link restoring...\r\n");
         }
@@ -253,9 +328,18 @@ static BaseType_t prvIpCommandCallback(char *pcWriteBuffer, size_t xWriteBufferL
         {
             char cIP[16] = {0}, cMask[16] = {0}, cGW[16] = {0};
 
-            strncpy(cIP, pcParam1, xParam1Len < 16 ? xParam1Len : 15);
-            strncpy(cMask, pcParam2, xParam2Len < 16 ? xParam2Len : 15);
-            strncpy(cGW, pcParam3, xParam3Len < 16 ? xParam3Len : 15);
+            size_t len1 = xParam1Len < 15 ? xParam1Len : 15;
+            size_t len2 = xParam2Len < 15 ? xParam2Len : 15;
+            size_t len3 = xParam3Len < 15 ? xParam3Len : 15;
+
+            memcpy(cIP, pcParam1, len1);
+            cIP[len1] = '\0';
+
+            memcpy(cMask, pcParam2, len2);
+            cMask[len2] = '\0';
+
+            memcpy(cGW, pcParam3, len3);
+            cGW[len3] = '\0';
 
             prvSetStaticIP(cIP, cMask, cGW);
 
@@ -277,7 +361,7 @@ static const CLI_Command_Definition_t xResetCommandDefinition = {
     .pcHelpString                = "reset:\r\n"
                                    "    Software MCU Reset.\r\n",
     .pxCommandInterpreter        = prvResetMCUCallback,
-    .cExpectedNumberOfParameters = 0 // Принимает от 0 до 3 параметров
+    .cExpectedNumberOfParameters = 0
 };
 
 //Описание структуры команды
@@ -307,11 +391,29 @@ static const CLI_Command_Definition_t xModeCommandDefinition = {
 static const CLI_Command_Definition_t xStepCommandDefinition = {
     .pcCommand                   = "step",
     .pcHelpString                = "step:\r\n"
-                                   "    Do step motor\r\n"
+                                   "    Do steps motor\r\n"
                                    "    Usage:\r\n"
                                    "        step <motor> <steps>",
     .pxCommandInterpreter        = prvStepCallback,
     .cExpectedNumberOfParameters = -1
+};
+
+static const CLI_Command_Definition_t xFileCommandDefinition = {
+    .pcCommand                   = "file",
+    .pcHelpString                = "file:\r\n"
+                                   "    Print file data\r\n"
+                                   "    Usage:\r\n"
+                                   "        file <net.bin|presets.bin>", // Ну пока это все что там хранится
+    .pxCommandInterpreter        = prvFileCallback,
+    .cExpectedNumberOfParameters = -1
+};
+
+static const CLI_Command_Definition_t xGerconsCommandDefinition = {
+    .pcCommand                   = "gerc",
+    .pcHelpString                = "gerc:\r\n"
+                                   "    Print gercons state table\r\n",
+    .pxCommandInterpreter        = prvGerconsCallback,
+    .cExpectedNumberOfParameters = 0
 };
 
 // Публичная функция регистрации
@@ -321,4 +423,6 @@ void vRegisterCommands(void)
     FreeRTOS_CLIRegisterCommand(&xResetCommandDefinition);
     FreeRTOS_CLIRegisterCommand(&xModeCommandDefinition);
     FreeRTOS_CLIRegisterCommand(&xStepCommandDefinition);
+    FreeRTOS_CLIRegisterCommand(&xFileCommandDefinition);
+    FreeRTOS_CLIRegisterCommand(&xGerconsCommandDefinition);
 }

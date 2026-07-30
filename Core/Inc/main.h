@@ -37,8 +37,10 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 
-// Выставляется чтобы пользоваться dhcp. В кубах почему-то нельзя задать статик и включить dhcp модуль одновременно
-//#define LWIP_DHCP 1
+#define PRESETS_NUM        3
+#define PRESET_NAME_LEN    64
+#define MOTORS_NUM         3
+#define GERCONS_NUM        6
 
   typedef enum
   {
@@ -71,13 +73,13 @@ typedef struct {
   uint8_t testCyclesLeft;     // Оставшееся количество циклов
   int8_t currentPreset;       // Текущий пресет (-1 если не активен)
 
-  uint32_t totalStepsMotors[3];
-  uint32_t avgStepsMotors[3];
-  uint8_t isMotorsCalibrated[3]; // флаги калибровки
-  uint8_t stateGercons[6];    // Состояние 6 концевиков (0 или 1)
+  uint32_t totalStepsMotors[MOTORS_NUM];
+  uint32_t avgStepsMotors[MOTORS_NUM];
+  uint8_t isMotorsCalibrated[MOTORS_NUM]; // флаги калибровки
+  uint8_t stateGercons[GERCONS_NUM];    // Состояние 6 концевиков (0 или 1)
 
-  int32_t presetPositions[3][3]; // [слот][мотор] (999999 - если пустой)
-  char presetNames[3][64];
+  int32_t presetPositions[PRESETS_NUM][MOTORS_NUM]; // [слот][мотор] (999999 - если пустой)
+  char presetNames[MOTORS_NUM][PRESET_NAME_LEN];
 
   uint8_t ip[4];
   uint8_t netmask[4];

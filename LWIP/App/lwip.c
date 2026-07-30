@@ -77,6 +77,14 @@ void MX_LWIP_Init(void)
   GATEWAY_ADDRESS[3] = 1;
 
 /* USER CODE BEGIN IP_ADDRESSES */
+
+  // Меняем на адрес из конфига, а не то что кубы выставили
+  for (int i = 0; i < 4; i++)
+  {
+    IP_ADDRESS[i] = bState.ip[i];
+    NETMASK_ADDRESS[i] = bState.netmask[i];
+    GATEWAY_ADDRESS[i] = bState.gateway[i];
+  }
 /* USER CODE END IP_ADDRESSES */
 
   /* Initialize the LwIP stack with RTOS */

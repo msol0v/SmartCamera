@@ -31,6 +31,22 @@
 /* Within 'USER CODE' section, code will be kept by default at each generation */
 /* USER CODE BEGIN 0 */
 
+// Выставляется чтобы пользоваться dhcp. В кубах почему-то нельзя задать статик и включить dhcp модуль одновременно
+#define LWIP_DHCP 1
+
+// Да будет зашифрованное соединение
+//Включаем абстрактный слой TCP
+#undef LWIP_ALTCP
+#define LWIP_ALTCP 1
+
+//Включаем поддержку TLS поверх Altcp
+#undef LWIP_ALTCP_TLS
+#define LWIP_ALTCP_TLS 1
+
+// Указываем LwIP использовать mbedTLS как провайдер TLS
+#undef LWIP_ALTCP_TLS_MBEDTLS
+#define LWIP_ALTCP_TLS_MBEDTLS 1
+
 /* USER CODE END 0 */
 
 #ifdef __cplusplus
@@ -41,12 +57,16 @@
 /* Parameters set in STM32CubeMX LwIP Configuration GUI -*/
 /*----- WITH_RTOS enabled (Since FREERTOS is set) -----*/
 #define WITH_RTOS 1
+/*----- WITH_MBEDTLS enabled (Since MBEDTLS and FREERTOS are set) -----*/
+#define WITH_MBEDTLS 1
 /*----- CHECKSUM_BY_HARDWARE enabled -----*/
 #define CHECKSUM_BY_HARDWARE 1
 /*-----------------------------------------------------------------------------*/
 
 /* LwIP Stack Parameters (modified compared to initialization value in opt.h) -*/
 /* Parameters set in STM32CubeMX LwIP Configuration GUI -*/
+/*----- Value in opt.h for LWIP_DNS: 0 -----*/
+#define LWIP_DNS 1
 /*----- Value in opt.h for MEM_ALIGNMENT: 1 -----*/
 #define MEM_ALIGNMENT 4
 /*----- Default Value for MEM_SIZE: 1600 ---*/
@@ -89,6 +109,8 @@
 #define DEFAULT_ACCEPTMBOX_SIZE 6
 /*----- Value in opt.h for RECV_BUFSIZE_DEFAULT: INT_MAX -----*/
 #define RECV_BUFSIZE_DEFAULT 2000000000
+/*----- Value in opt.h for LWIP_USE_EXTERNAL_MBEDTLS: 0 -----*/
+#define LWIP_USE_EXTERNAL_MBEDTLS 1
 /*----- Default Value for LWIP_HTTPD: 0 ---*/
 #define LWIP_HTTPD 1
 /*----- Default Value for LWIP_HTTPD_CGI: 0 ---*/

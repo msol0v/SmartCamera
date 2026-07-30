@@ -19,7 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include "lwip.h"
+#include "mbedtls.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -28,12 +28,12 @@
 #include "motor_task.h"
 #include "pwm_task.h"
 #include "tcp.h"
-#include "tcp_priv.h"
+#include "app_storage.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#include "stepper.h"
+#include "lwip.h"
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -184,52 +184,20 @@ int main(void)
   MX_TIM8_Init();
   MX_TIM9_Init();
   MX_RNG_Init();
+  /* Call PreOsInit function */
+  MX_MBEDTLS_Init();
   /* USER CODE BEGIN 2 */
 
-  // Конфигурируем QSPI для работы в MemoryMapped режиме
-  // QSPI_CommandTypeDef cmd;
-  // QSPI_MemoryMappedTypeDef cfg;
-  //
-  // cmd.InstructionMode = QSPI_INSTRUCTION_1_LINE;
-  // cmd.Instruction = 0xEB;
-  // cmd.AddressMode = QSPI_ADDRESS_4_LINES;
-  // cmd.AddressSize = QSPI_ADDRESS_24_BITS;
-  // cmd.DataMode = QSPI_DATA_4_LINES;
-  // cmd.DummyCycles = 6;
-  // cmd.AlternateByteMode = QSPI_ALTERNATE_BYTES_4_LINES;
-  //
-  // cfg.TimeOutActivation = QSPI_TIMEOUT_COUNTER_DISABLE;
-  // cfg.TimeOutPeriod = 0;
-  //
-  // HAL_StatusTypeDef status = HAL_QSPI_MemoryMapped(&hqspi, &cmd, &cfg);
-  // printf("HAL_QSPI_MemoryMapped returned 0x%x\n", status);
+  // 1. Отключаем буферизацию stdout для моментального вывода printf в UART
+  setvbuf(stdout, NULL, _IONBF, 0);
 
-  /* Инициализация структуры состояния платы */
-
-  // Инициализируем нулями
-  memset(&bState, 0, sizeof(bState));
-
-  // Аппаратный рандом
+  // 2. Дефолты структуры bState
+  memset((void*)&bState, 0, sizeof(bState));
   HAL_RNG_GenerateRandomNumber(&hrng, (uint32_t *)&bState.sessionID);
-  // Стартуем с веба
   bState.controlMode = CONTROL_MODE_MVS;
-
-  // TODO Сделать подгрузку сетевых настроек из памяти
-  bState.ip[0] = 192;
-  bState.ip[1] = 168;
-  bState.ip[2] = 100;
-  bState.ip[3] = 10;
-  bState.netmask[0] = 255;
-  bState.netmask[1] = 255;
-  bState.netmask[2] = 255;
-  bState.netmask[3] = 0;
-  bState.gateway[0] = 192;
-  bState.gateway[1] = 168;
-  bState.gateway[2] = 100;
-  bState.gateway[3] = 1;
-
-  //printf("WAIT 10 sec\r\n");
-  //HAL_Delay(10000);
+  bState.selectedMotor = -1;
+  bState.currentPreset = -1;
+  bState.isActiveAutoTest = 0;
 
   /* USER CODE END 2 */
 
@@ -237,7 +205,6 @@ int main(void)
   osKernelInitialize();
 
   /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
@@ -651,31 +618,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-#include "lwip/tcp.h"
-#include "lwip/priv/tcp_priv.h"
-
-// Внешний список активных TCP-соединений LwIP
-extern struct tcp_pcb *tcp_active_pcbs;
-
-uint16_t get_http_tcp_clients_count(void) {
-  uint16_t count = 0;
-
-  // Блокируем контекст LwIP для потокобезопасного чтения списка
-  SYS_ARCH_DECL_PROTECT(lev);
-  SYS_ARCH_PROTECT(lev);
-
-  struct tcp_pcb *pcb = tcp_active_pcbs;
-  while (pcb != NULL) {
-    // Фильтруем по порту (например, 80) и состоянию ESTABLISHED
-    if (pcb->local_port == 80 && pcb->state == ESTABLISHED) {
-      count++;
-    }
-    pcb = pcb->next;
-  }
-
-  SYS_ARCH_UNPROTECT(lev);
-  return count;
-}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -687,9 +629,21 @@ uint16_t get_http_tcp_clients_count(void) {
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void *argument)
 {
-  /* init code for LWIP */
-  MX_LWIP_Init();
   /* USER CODE BEGIN 5 */
+  printf("System starting...\r\n");
+
+  if (Storage_Init()) {
+    Storage_LoadState();
+    printf("Storage initialized successfully!\r\n");
+  } else {
+    printf("Storage Init Failed! Using fallback IP.\r\n");
+    bState.ip[0] = 192;      bState.ip[1] = 168;      bState.ip[2] = 100;    bState.ip[3] = 10;
+    bState.netmask[0] = 255; bState.netmask[1] = 255; bState.netmask[2] = 255; bState.netmask[3] = 0;
+    bState.gateway[0] = 192; bState.gateway[1] = 168; bState.gateway[2] = 100; bState.gateway[3] = 1;
+  }
+
+  MX_LWIP_Init();
+
   //Стартуем веб
   httpd_init();
   Router_Init();
