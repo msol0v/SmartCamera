@@ -1,5 +1,13 @@
 cmake_minimum_required(VERSION 3.22)
 
+set(CMAKE_SYSTEM_NAME Generic)
+set(CMAKE_SYSTEM_PROCESSOR ARM)
+
+set(CMAKE_C_COMPILER arm-none-eabi-gcc)
+set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
+set(CMAKE_ASM_COMPILER arm-none-eabi-gcc)
+
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 #
 # This file is generated only once,
 # and is not re-generated if converter is called multiple times.
@@ -82,6 +90,11 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
         LFS_THREADSAFE
         #LFS_YES_TRACE // Если надо отладить ФС
+)
+
+target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
+        -mcpu=cortex-m7
+        -mthumb
 )
 
 # Remove wrong libob.a library dependency when using cpp files

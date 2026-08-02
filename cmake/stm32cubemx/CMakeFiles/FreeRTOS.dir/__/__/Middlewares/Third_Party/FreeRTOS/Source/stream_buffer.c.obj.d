@@ -1,0 +1,37 @@
+cmake/stm32cubemx/CMakeFiles/FreeRTOS.dir/__/__/Middlewares/Third_Party/FreeRTOS/Source/stream_buffer.c.obj: \
+  /home/ms0lov/CLionProjects/SmartCamera/Middlewares/Third_Party/FreeRTOS/Source/stream_buffer.c \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/lib/clang/21/include/stdint.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/stdint.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/sys/cdefs.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/sys/config.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/machine/ieeefp.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/sys/features.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/picolibc.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/machine/_default_types.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/sys/_stdint.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/sys/_intsup.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/string.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/lib/clang/21/include/stddef.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/lib/clang/21/include/__stddef_size_t.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/lib/clang/21/include/__stddef_null.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/sys/_locale.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/strings.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/sys/_types.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/lib/clang/21/include/__stddef_wint_t.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/machine/_types.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/bin/../lib/clang-runtimes/arm-none-eabi/include/sys/string.h \
+  /home/ms0lov/CLionProjects/SmartCamera/cmake/stm32cubemx/../../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/lib/clang/21/include/__stddef_header_macro.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/lib/clang/21/include/__stddef_ptrdiff_t.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/lib/clang/21/include/__stddef_wchar_t.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/lib/clang/21/include/__stddef_max_align_t.h \
+  /home/ms0lov/st/stm32cubeclt_1.21.0/st-arm-clang/lib/clang/21/include/__stddef_offsetof.h \
+  /home/ms0lov/CLionProjects/SmartCamera/cmake/stm32cubemx/../../Core/Inc/FreeRTOSConfig.h \
+  /home/ms0lov/CLionProjects/SmartCamera/cmake/stm32cubemx/../../Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h \
+  /home/ms0lov/CLionProjects/SmartCamera/cmake/stm32cubemx/../../Middlewares/Third_Party/FreeRTOS/Source/include/portable.h \
+  /home/ms0lov/CLionProjects/SmartCamera/cmake/stm32cubemx/../../Middlewares/Third_Party/FreeRTOS/Source/include/deprecated_definitions.h \
+  /home/ms0lov/CLionProjects/SmartCamera/cmake/stm32cubemx/../../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1/portmacro.h \
+  /home/ms0lov/CLionProjects/SmartCamera/cmake/stm32cubemx/../../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h \
+  /home/ms0lov/CLionProjects/SmartCamera/cmake/stm32cubemx/../../Middlewares/Third_Party/FreeRTOS/Source/include/task.h \
+  /home/ms0lov/CLionProjects/SmartCamera/cmake/stm32cubemx/../../Middlewares/Third_Party/FreeRTOS/Source/include/list.h \
+  /home/ms0lov/CLionProjects/SmartCamera/cmake/stm32cubemx/../../Middlewares/Third_Party/FreeRTOS/Source/include/stream_buffer.h

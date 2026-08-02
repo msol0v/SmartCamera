@@ -19,7 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include "mbedtls.h"
+#include "lwip.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -184,8 +184,6 @@ int main(void)
   MX_TIM8_Init();
   MX_TIM9_Init();
   MX_RNG_Init();
-  /* Call PreOsInit function */
-  MX_MBEDTLS_Init();
   /* USER CODE BEGIN 2 */
 
   // 1. Отключаем буферизацию stdout для моментального вывода printf в UART
@@ -629,6 +627,8 @@ static void MX_GPIO_Init(void)
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void *argument)
 {
+  /* init code for LWIP */
+  MX_LWIP_Init();
   /* USER CODE BEGIN 5 */
   printf("System starting...\r\n");
 
