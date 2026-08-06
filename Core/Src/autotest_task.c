@@ -13,13 +13,13 @@ const osThreadAttr_t autoTestTask_attributes = {
 
 void AutoTestTask(void *argument)
 {
-    // 1. Извлекаем аргументы и освобождаем динамическую память
+    // Извлекаем аргументы и освобождаем динамическую память
     TestTaskArgs_t *args = (TestTaskArgs_t *)argument;
     uint8_t motors_mask = args->target_motors_mask;
     uint16_t total_cycles = args->total_cycles;
     vPortFree(args);
 
-    // 2. Инициализируем флаги в глобальной структуре bState
+    // Инициализируем флаги в глобальной структуре bState
     bState.isActiveAutoTest = 1;
     bState.testMotorsMask = motors_mask;
     bState.testCyclesLeft = total_cycles;
@@ -32,7 +32,7 @@ void AutoTestTask(void *argument)
     MotorCommand_t cmd; // Переменная команды для отправки в очередь
 
     // =========================================================================
-    // ЭТАП 0: Калибровка (Хоминг к левому концевику)
+    // ЭТАП 0: Калибровка (Хоминг(прикольно) к левому концевику)
     // =========================================================================
     for (uint8_t i = 0; i < 3; i++) {
         if (motors_mask & (1 << i)) {
@@ -120,25 +120,25 @@ void AutoTestTask(void *argument)
 
 uint8_t StartAutoTest(uint8_t motors_mask, uint16_t cycles)
 {
-    // 1. Проверяем, не запущен ли уже тест
+    // Проверяем, не запущен ли уже тест
     if (autoTestTaskHandle != NULL || bState.isActiveAutoTest) {
         return 0; // Занято / Автотест уже выполняется
     }
 
-    // 2. Выделяем память под структуру аргументов из кучи FreeRTOS
+    // Выделяем память под структуру аргументов из кучи FreeRTOS
     TestTaskArgs_t *args = (TestTaskArgs_t *)pvPortMalloc(sizeof(TestTaskArgs_t));
     if (args == NULL) {
         return 0; // Ошибка: не хватило RAM
     }
 
-    // 3. Заполняем аргументы
+    // Заполняем аргументы
     args->target_motors_mask = motors_mask;
     args->total_cycles = cycles;
 
-    // 4. Динамически создаем задачу с помощью CMSIS-RTOS v2 API
+    // Динамически создаем задачу
     autoTestTaskHandle = osThreadNew(AutoTestTask, (void *)args, &autoTestTask_attributes);
 
-    // 5. Проверяем, создался ли поток
+    // Проверяем, создался ли поток
     if (autoTestTaskHandle == NULL) {
         vPortFree(args); // Если создать поток не удалось, освобождаем память!
         return 0;
@@ -149,21 +149,18 @@ uint8_t StartAutoTest(uint8_t motors_mask, uint16_t cycles)
 
 void StopAutoTest(void)
 {
-    // 1. Принудительно уничтожаем задачу автотеста
+    // Принудительно уничтожаем задачу автотеста
     if (autoTestTaskHandle != NULL) {
         osThreadTerminate(autoTestTaskHandle);
         autoTestTaskHandle = NULL;
     }
 
-    // 2. Сбрасываем очередь, чтобы моторы не доделывали "повисшие" шаги
+    // Сбрасываем очередь, чтобы моторы не доделывали "повисшие" шаги
     if (motorQueueHandle != NULL) {
         osMessageQueueReset(motorQueueHandle);
     }
 
-    // 3. Обновляем статус системы
+    // Обновляем статус системы
     bState.isActiveAutoTest = 0;
     bState.testCyclesLeft = 0;
-
-    // 4. Обесточиваем моторы
-    //DisableAllMotorDrivers();
 }

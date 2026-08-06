@@ -31,6 +31,65 @@ static BaseType_t prvGerconsCallback(char *pcWriteBuffer, size_t xWriteBufferLen
     return pdFALSE;
 }
 
+static BaseType_t prvCalibrationCallback(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString) {
+    // Надо вынести в отдельную функцию извлечение аргументов, поменьше копирования кода будет!
+    BaseType_t xParamLen1 = 0, xParamLen2 = 0;
+    const char *pcParam1, *pcParam2;
+
+    pcParam1 = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen1);
+    pcParam2 = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen2);
+
+    // Проверка наличия аргументов
+    if (pcParam1 == NULL || pcParam2 == NULL || xParamLen1 == 0 || xParamLen2 == 0)
+    {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Error: 2 arguments required: <motor> <step>\r\n");
+        return pdFALSE;
+    }
+
+    // Буферы для создания честных C-строк с '\0' на конце
+    char szParam1[16] = {0};
+    char szParam2[16] = {0};
+
+    // Проверка, что аргументы помещаются в буфер
+    if (xParamLen1 >= sizeof(szParam1) || xParamLen2 >= sizeof(szParam2))
+    {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Error: Argument too long!\r\n");
+        return pdFALSE;
+    }
+
+    // Копируем ровно столько байт, сколько занимает аргумент
+    strncpy(szParam1, pcParam1, xParamLen1);
+    szParam1[xParamLen1] = '\0';
+
+    strncpy(szParam2, pcParam2, xParamLen2);
+    szParam2[xParamLen2] = '\0';
+
+    char *endptr1, *endptr2;
+    long val1 = strtol(szParam1, &endptr1, 10);
+    long val2 = strtol(szParam2, &endptr2, 10);
+
+    // Проверка, были ли параметры действительными числами (*endptr != '\0' значит, что были лишние символы)
+    if ((endptr1 == szParam1) || (*endptr1 != '\0') || (endptr2 == szParam2) || (*endptr2 != '\0'))
+    {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Error: arguments must be integers!\r\n");
+        return pdFALSE;
+    }
+
+    // Первый аргумент: от 0 до 2
+    if (val1 < 0 || val1 > 2)
+    {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Error: 1st argument (motor) must be between 0 and 2 (passed: %ld)\r\n", val1);
+        return pdFALSE;
+    }
+
+    uint8_t motors_mask = (uint8_t)val1;
+    uint16_t cycles = (int8_t)val2;
+
+    StartAutoTest(motors_mask, cycles);
+
+    return pdFALSE;
+}
+
 static BaseType_t prvFileCallback(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString) {
     //Проверяем, смонтирована ли ФС
     if (!Storage_IsMounted()) {
@@ -393,7 +452,7 @@ static const CLI_Command_Definition_t xStepCommandDefinition = {
     .pcHelpString                = "step:\r\n"
                                    "    Do steps motor\r\n"
                                    "    Usage:\r\n"
-                                   "        step <motor> <steps>",
+                                   "        step <motor> <steps>\r\n",
     .pxCommandInterpreter        = prvStepCallback,
     .cExpectedNumberOfParameters = -1
 };
@@ -403,7 +462,7 @@ static const CLI_Command_Definition_t xFileCommandDefinition = {
     .pcHelpString                = "file:\r\n"
                                    "    Print file data\r\n"
                                    "    Usage:\r\n"
-                                   "        file <net.bin|presets.bin>", // Ну пока это все что там хранится
+                                   "        file <net.bin|presets.bin>\r\n", // Ну пока это все что там хранится
     .pxCommandInterpreter        = prvFileCallback,
     .cExpectedNumberOfParameters = -1
 };
@@ -416,6 +475,16 @@ static const CLI_Command_Definition_t xGerconsCommandDefinition = {
     .cExpectedNumberOfParameters = 0
 };
 
+static const CLI_Command_Definition_t xCalibrationCommandDefinition = {
+    .pcCommand                   = "calib",
+    .pcHelpString                = "calib:\r\n"
+                                   "    Start motors auto test\r\n"
+                                   "    Usage:\r\n"
+                                   "        calib <mask> <cycles>\r\n",
+    .pxCommandInterpreter        = prvCalibrationCallback,
+    .cExpectedNumberOfParameters = -1
+};
+
 // Публичная функция регистрации
 void vRegisterCommands(void)
 {
@@ -425,4 +494,5 @@ void vRegisterCommands(void)
     FreeRTOS_CLIRegisterCommand(&xStepCommandDefinition);
     FreeRTOS_CLIRegisterCommand(&xFileCommandDefinition);
     FreeRTOS_CLIRegisterCommand(&xGerconsCommandDefinition);
+    FreeRTOS_CLIRegisterCommand(&xCalibrationCommandDefinition);
 }
