@@ -642,8 +642,6 @@ void StartDefaultTask(void *argument)
     bState.gateway[0] = 192; bState.gateway[1] = 168; bState.gateway[2] = 100; bState.gateway[3] = 1;
   }
 
-  MX_LWIP_Init();
-
   //Стартуем веб
   httpd_init();
   Router_Init();
