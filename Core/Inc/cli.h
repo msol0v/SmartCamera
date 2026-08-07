@@ -26,6 +26,11 @@ extern const osThreadAttr_t cliTask_attributes;
 
 void vCommandConsoleTask( void *pvParameters );
 
+// Регистрация команд в CLI
 extern void vRegisterCommands(void);
+// Установка дескриптора текущей активной задачи выполнения команды
+extern void setCurrentActiveCmdTask(osThreadId_t newActiveCmdTask);
+// Остановка задачи 
+extern void killCurrentActiveCmdTask(void);
 
 #endif //SMARTCAMERA_CLI_H

@@ -18,6 +18,28 @@
 #include "pwm_task.h"
 #include "app_storage.h"
 
+// Обработка заверщения текущей активной задачи
+static osThreadId_t currentActiveCmdTask = NULL; // Дескриптор текущей активной задачи
+
+void setCurrentActiveCmdTask(osThreadId_t newActiveCmdTask){
+    currentActiveCmdTask = newActiveCmdTask;
+}
+
+void killCurrentActiveCmdTask(void){
+    if (currentActiveCmdTask == NULL) {
+        return;
+    }
+    /* Пока задача с долгим выполением одна, при желании можно сюда больше добавить.
+     * Правильным будет дописать обработчики чтобы вывод команды не завершался до окончания ее выполнения, но тут навороты сложные
+     * ради одной задачи смысла не вижу
+     */
+    if (currentActiveCmdTask == autoTestTaskHandle) {
+        StopAutoTest();
+    }
+
+    currentActiveCmdTask = NULL;
+}
+
 static BaseType_t prvResetMCUCallback(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString) {
     __disable_irq();
     NVIC_SystemReset();
@@ -86,6 +108,7 @@ static BaseType_t prvCalibrationCallback(char *pcWriteBuffer, size_t xWriteBuffe
     uint16_t cycles = (int8_t)val2;
 
     StartAutoTest(motors_mask, cycles);
+    setCurrentActiveCmdTask(autoTestTaskHandle);
 
     return pdFALSE;
 }

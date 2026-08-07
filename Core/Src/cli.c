@@ -165,6 +165,9 @@ void vCommandConsoleTask(void *pvParameters)
             // === Обработка Ctrl + C ===
             if (cRxedChar == 0x03)
             {
+                // Убиваем активную задачу команды если она есть 
+                killCurrentActiveCmdTask();
+
                 HAL_UART_Transmit(pxUart, (uint8_t *)"^C\r\n>", 5, HAL_MAX_DELAY);
                 cInputIndex = 0;
                 pcInputString[0] = '\0';

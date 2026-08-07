@@ -155,6 +155,11 @@ void StopAutoTest(void)
         autoTestTaskHandle = NULL;
     }
 
+    // Сброс енейблов 
+    HAL_GPIO_WritePin(EN_DRIV1_GPIO_Port, EN_DRIV1_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(EN_DRIV2_GPIO_Port, EN_DRIV2_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(EN_DRIV3_GPIO_Port, EN_DRIV3_Pin, GPIO_PIN_RESET);
+
     // Сбрасываем очередь, чтобы моторы не доделывали "повисшие" шаги
     if (motorQueueHandle != NULL) {
         osMessageQueueReset(motorQueueHandle);
